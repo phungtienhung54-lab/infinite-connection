@@ -1,96 +1,108 @@
 import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import * as cheerio from "cheerio";
 
 const ROOT = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
-const SOURCES_FILE = path.join(ROOT, "scripts", "sources", "fundings_sources.json");
 const OUT = path.join(ROOT, "src", "lib", "fundings-data.json");
 
 const UA = "InfiniteConnectionPreview/0.1 (+https://github.com/schneiderlin/infinite-connection)";
-const GAP_MS = 1500;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 async function fetchWithUA(url) {
   const res = await fetch(url, {
     headers: { "User-Agent": UA },
-    signal: AbortSignal.timeout(15_000),
+    signal: AbortSignal.timeout(20_000),
   });
-  if (res.status === 401 || res.status === 403 || res.status === 429) throw new Error(`blocked: HTTP ${res.status}`);
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   return res;
 }
 
-function extractMeta(html, fallbackName) {
-  const titleMatch = html.match(/<title[^>]*>([^<]+)<\/title>/i);
-  const descMatch = html.match(/<meta[^>]*name=["']description["'][^>]*content=["']([^"']+)["']/i) 
-                 || html.match(/<meta[^>]*content=["']([^"']+)["'][^>]*name=["']description["']/i);
-  return {
-    title: titleMatch ? titleMatch[1].trim().substring(0, 100) : fallbackName,
-    summary: descMatch ? descMatch[1].trim().substring(0, 150) : "点击查看详细内容",
-  };
-}
-
-function guessFundingStyle(name) {
-  // 尝试猜测类型，默认都是资助
-  if (/物资|设备|捐赠/i.test(name)) return { kind: "物资", type: "物资需求", supportType: "物资" };
-  if (/政府|民政|采购/i.test(name)) return { kind: "资助", type: "政府购买", supportType: "资金" };
-  if (/企业|CSR|腾讯|阿里|蚂蚁|字节/i.test(name)) return { kind: "资助", type: "企业CSR", supportType: "资金" };
-  return { kind: "资助", type: "慈善会/基金会资助", supportType: "资金" };
-}
-
 async function main() {
-  console.log("🚀 开始抓取资助模块的真实数据...\n");
-  const sources = JSON.parse(await readFile(SOURCES_FILE, "utf8"));
+  console.log("🚀 开始抓取资助模块的真实项目数据...\n");
+  
+  // 列表页地址
+  const urls = [
+    { url: "https://www.chinadevelopmentbrief.org.cn/abutment/category/17.html", type: "公益资助" },
+    { url: "https://www.chinadevelopmentbrief.org.cn/abutment/category/18.html", type: "招标信息" },
+  ];
+  
   const allFundings = [];
-  let successCount = 0;
+  const report = [];
 
-  for (let i = 0; i < sources.length; i++) {
-    const src = sources[i];
-    console.log(`[${i + 1}/${sources.length}] 正在抓取: ${src.name}`);
+  for (let i = 0; i < urls.length; i++) {
+    const { url, type } = urls[i];
+    console.log(`[${i + 1}/${urls.length}] 正在抓取: ${type}`);
+
     try {
-      const res = await fetchWithUA(src.url);
+      const res = await fetchWithUA(url);
       const html = await res.text();
-      const meta = extractMeta(html, src.name);
-      const style = guessFundingStyle(src.name);
+      const $ = cheerio.load(html);
+      
+      let count = 0;
+      
+      // 🚨 终极杀器：抓取所有 href 包含 "/abutment/detail/" 的 <a> 标签
+      $('a[href*="/abutment/detail/"]').each((idx, element) => {
+        if (count >= 20) return; // 最多 20 条
 
-      // 尝试从摘要中提取金额，比如 "20-80万" 或 "50万元"
-      let amount = "面议";
-      let amountWan = 0;
-      const amountMatch = meta.summary.match(/(\d+[\.,]?\d*)[-–~]?(\d+[\.,]?\d*)?\s*万/);
-      if (amountMatch) {
-        amount = amountMatch[0];
-        amountWan = parseFloat(amountMatch[1]);
-      }
+        const $el = $(element);
+        const href = $el.attr('href') || '';
+        const title = $el.find('.title').text().trim() || $el.text().trim();
+        
+        // 只要标题太短就跳过（防止抓到无关链接）
+        if (!title || title.length < 5 || title.includes("上一篇") || title.includes("下一篇")) return;
 
-      allFundings.push({
-        id: `fund-${i + 1}`,
-        kind: style.kind,
-        type: style.type,
-        supportType: style.supportType,
-        duration: "6-12个月",
-        field: "综合",
-        region: "全国",
-        title: meta.title,
-        summary: meta.summary,
-        org: src.name,
-        location: "全国",
-        amount: amount,
-        amountWan: amountWan,
-        dueDays: 0,
-        due: "长期有效",
-        publishedDays: 0,
+        // 尝试找活动时间和地址（可能不在同一个 a 标签里，做个兼容）
+        const parent = $el.parent();
+        const timeText = parent.find('.desc').text().trim() || parent.text().trim();
+        
+        // 提取截止日期
+        const dateMatch = timeText.match(/(\d{4}-\d{2}-\d{2})/g);
+        const endDate = dateMatch && dateMatch.length > 0 ? dateMatch[dateMatch.length - 1] : "长期有效";
+
+        allFundings.push({
+          id: `fund-${type === "公益资助" ? "17" : "18"}-${count + 1}`,
+          kind: "资助",
+          type: type === "公益资助" ? "慈善会/基金会资助" : "政府购买",
+          supportType: "资金",
+          duration: "6-12个月",
+          field: "综合",
+          region: "全国",
+          title: `【${type}】${title}`,
+          summary: `来自中国发展简报`,
+          org: "中国发展简报",
+          location: "全国",
+          amount: "面议",
+          amountWan: 0,
+          dueDays: 0,
+          due: endDate,
+          publishedDays: 0,
+        });
+        count++;
       });
-      successCount++;
-      console.log(`   ✅ 成功抓取`);
+
+      report.push(`✅ ${type}: ${count} 条真实项目`);
+      console.log(`   ✅ 成功提取 ${count} 条`);
     } catch (err) {
+      report.push(`❌ ${type}: ${err.message}`);
       console.log(`   ❌ 抓取失败: ${err.message}`);
     }
-    if (i < sources.length - 1) await sleep(GAP_MS);
+    
+    await sleep(1500);
   }
 
-  await writeFile(OUT, JSON.stringify(allFundings, null, 2) + "\n", "utf8");
-  console.log(`\n📊 抓取结束！成功: ${successCount} 条`);
-  console.log(`✅ 数据已保存到 src/lib/fundings-data.json`);
+    // 🚨 去重逻辑：根据 title 去重
+  const uniqueFundings = Array.from(
+    new Map(allFundings.map(item => [item.title, item])).values()
+  );
+
+  const normalized = uniqueFundings.map((j, idx) => ({ id: `fund-scraped-${idx + 1}`, ...j }));
+  await writeFile(OUT, JSON.stringify(normalized, null, 2) + "\n", "utf8");
+
+  console.log("\n" + "=".repeat(40));
+  console.log(report.join("\n"));
+  console.log("=".repeat(40));
+  console.log(`📊 共抓取到 ${normalized.length} 条真实项目，已保存到 src/lib/fundings-data.json`);
 }
 
 main();

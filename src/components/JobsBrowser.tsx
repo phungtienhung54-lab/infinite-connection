@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { filterGroups, type JobItem } from "@/lib/platform-data";
-import scrapedJobs from "@/lib/jobs-scraped.json";
+import scrapedJobs from "@/lib/jobs-data.json";
 import { TypeTabs, FilterRow, SearchInput, EmptyState } from "./platform-ui";
 import { PublishDialog } from "./PublishDialog";
 
@@ -87,7 +87,7 @@ export function JobsBrowser() {
 
   const publish = (values: Record<string, string>) => {
     const item: JobItem = {
-      id: Date.now(),
+      id: String(Date.now()),
       category: "人员招聘",
       kind: (values.kind as JobItem["kind"]) || "全职",
       role: values.role || "项目官员",

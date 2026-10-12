@@ -16,7 +16,7 @@ export type UpdateMedia = {
 };
 
 export type UpdateItem = {
-  id: number;
+  id: string;
   kind: "最新动态" | "项目主页" | "志愿活动" | "行业活动";
   posterType: "机构" | "个人";
   field: string;
@@ -283,7 +283,7 @@ export const platformStats = [
 /* ---------- 资金 & 物资 ---------- */
 
 export type FundingItem = {
-  id: string
+  id: string;
   kind: "资助" | "需求" | "物资";
   type: string;
   supportType: "资金" | "物资";
@@ -302,6 +302,7 @@ export type FundingItem = {
 };
 
 export const fundings: FundingItem[] = fundingsData as unknown as FundingItem[];
+
 // export const fundings: FundingItem[] = [
 //   {
 //     id: 1,

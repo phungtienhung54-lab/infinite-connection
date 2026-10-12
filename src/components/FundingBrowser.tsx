@@ -165,8 +165,8 @@ export function FundingBrowser() {
                   <span className={`tag ${kindTagClass[f.kind] ?? "tag-green"}`}>{f.type}</span>
                   <span className="tag tag-pink">{f.field}</span>
                   <span className="spacer" />
-                  <span className={`tag ${f.dueDays <= 7 ? "tag-red" : "tag-yellow"}`}>
-                    ⏱ {f.dueDays}天截止
+                  <span className={`tag ${f.dueDays > 0 && f.dueDays <= 7 ? "tag-red" : "tag-yellow"}`}>
+                  {f.dueDays > 0 ? `${f.dueDays}天截止` : "长期有效"}
                   </span>
                 </div>
                 <h3 className="card-title">{f.title}</h3>
