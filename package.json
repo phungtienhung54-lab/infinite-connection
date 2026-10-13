@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "scrape:jobs": "node scripts/scrape-jobs.mjs"
+    "scrape:jobs": "node --use-env-proxy scripts/scrape-jobs.mjs"
   },
   "dependencies": {
     "next": "16.3.5",

@@ -8,12 +8,17 @@
 
 | 模块 | 来源 | 接入状态 | 当前页面数据 |
 | --- | --- | --- | --- |
-| 人力资源 / 招聘 | [中国发展简报·NGO 招聘](https://www.chinadevelopmentbrief.org.cn/jobs.html) | 已接入列表接口 | 默认展示 20 条抓取快照，无内置 mock 数据 |
+| 人力资源 / 招聘 | [中国发展简报·NGO 招聘](https://www.chinadevelopmentbrief.org.cn/jobs.html) | 已接入列表接口 | 去重后 17 条 |
+| 人力资源 / 招聘 | [中国公共招聘网](http://job.mohrss.gov.cn/) | 已接入公开搜索结果页 | 13 条公益 / 社会服务岗位 |
+| 人力资源 / 招聘 | [壹基金·工作机会](https://onefoundation.cn/jobs/) | 已接入机构官网列表 | 4 条 |
+| 人力资源 / 招聘 | [美丽中国支教·成为员工](http://www.meilizhongguo.org/join-us) | 已接入机构官网列表与详情页 | 6 条 |
+| 人力资源 / 招聘 | [ReliefWeb](https://reliefweb.int/jobs) | 已接入官方公开 RSS | 20 条中国或不限地点岗位 |
+| 人力资源 / 招聘 | [NGO Job Board](https://ngojobboard.org/) | 已接入官方公开 RSS | 8 条 |
 | 项目动态 | 无 | 未接入 | 静态 mock 数据 |
 | 资金 & 物资 | 无 | 未接入 | 静态 mock 数据 |
 | 能力工具 | 无 | 未接入 | 静态 mock 数据 |
 
-候选招聘来源来自 [`references/公益招聘网站信息库.xlsx`](./references/公益招聘网站信息库.xlsx)。候选清单不代表已经接入，也不代表链接、采集许可或字段仍然有效。
+候选招聘来源来自 [`references/公益招聘网站信息库.xlsx`](./references/公益招聘网站信息库.xlsx)。2026-10-13 生成的当前快照共 68 条；各来源原始结果合计 71 条，统一入口按原始 URL 和“机构 + 标题”去重后保留 68 条。候选清单不代表已经接入，也不代表链接、采集许可或字段仍然有效。
 
 ## 当前采集链路
 
@@ -31,7 +36,7 @@ pnpm scrape:jobs
 - 脚本：[`scripts/scrape-jobs.mjs`](../scripts/scrape-jobs.mjs)
 - 快照：[`src/lib/jobs-scraped.json`](../src/lib/jobs-scraped.json)
 - 页面接入：[`src/components/JobsBrowser.tsx`](../src/components/JobsBrowser.tsx)
-- 每次只请求每个来源的前 20 条；启动 `pnpm dev` 不会自动刷新。
+- 每个来源适配器最多输出 20 条；公共招聘网的三个关键词各只请求第一页，机构官网只读取当前公开列表，RSS 只读取当前 feed。启动 `pnpm dev` 不会自动刷新。
 - 快照本身没有 `scrapedAt`、来源版本或本次采集报告等元数据。
 - 首页“人力资源”入口的当前收录岗位数和机构数也由这份快照计算。
 - 侧栏的“当前收录机构”和“当前远程岗位”由这份快照计算；来源不能支持的“急招岗位”“本月新增岗位”“累计投递”显示“无法计算”，不再使用 mock 值。
@@ -125,6 +130,71 @@ pnpm scrape:jobs
 6. **来源 ID 没有保存。** 站内生成 ID 随排序改变，不适合去重、更新或增量同步。
 7. **接口没有稳定性承诺。** 需要保留失败报告，并在字段变化时停止错误映射，而不是静默填充默认值。
 
+## 其他已接入来源
+
+以下字段记录基于 2026-10-08 的实时响应。各适配器都返回统一的 `JobItem` 形对象，但日期为空时使用 `publishedDays: 36500` 和“发布时间未知”，不会用抓取时间伪装发布日期。
+
+### 中国公共招聘网
+
+| 项目 | 当前值 |
+| --- | --- |
+| 列表入口 | `GET http://job.mohrss.gov.cn/cjobs/jobinfolist/listJobinfolist?pageNo=1&orderType=time&textfield={关键词}` |
+| 关键词 | `社会工作`、`社工`、`公益` |
+| 原始格式 | 服务端 HTML；`input#findjoblist` 的 `value` 是 HTML 实体编码的 JSON 数组 |
+| 当前样本 | 2026-10-13 筛选、去重后 13 条 |
+| 详情页 | `/cjobs/jobinfolist/cb21/showgw?id={acb200}` |
+
+使用 `acb200`、`aca112`、`aab004`、`area_`、`aab302`、`acb240`、`acb241`、`acb242`、`acb22a`、`aca111_`。来源同时返回联系人和电话，但适配器不读取这些字段，并会从摘要中剔除联系方式。`s_ctime`、`s_uptime`、`s_aae397` 等日期没有足够明确的页面语义，因此不映射为发布时间或截止日期。
+
+该平台大量内容不是公益行业岗位；适配器只保留机构名称、岗位名称、工种或描述能明确证明属于社会工作 / 公益服务的记录。关键词命中本身不构成保留条件。
+
+### 壹基金·工作机会
+
+| 项目 | 当前值 |
+| --- | --- |
+| 列表入口 | `GET https://onefoundation.cn/jobs/` |
+| 原始格式 | 服务端 HTML；全职和实习分别位于 `form.job_form` |
+| 当前样本 | 2026-10-13 共 4 条 |
+| 可确认字段 | 职位名、全职 / 实习类别、城市、职责正文、详情 URL；部分实习岗位有补贴 |
+| 日期 | 原站没有可确认的发布或截止日期 |
+
+列表页已经包含职位正文。适配器只抽取职责摘要，不读取投递表单、姓名、邮箱、电话或简历上传字段。
+
+### 美丽中国支教·成为员工
+
+| 项目 | 当前值 |
+| --- | --- |
+| 列表入口 | `GET http://www.meilizhongguo.org/join-us` |
+| 当前样本 | 6 条 |
+| 可确认字段 | 部门、职位名、地点、详情 URL |
+| 详情字段 | `blogPostMeta.state`、`publishedAt`、`publicUrl`，以及页面 meta 的标题和摘要 |
+| 日期 | `publishedAt` 是 CMS 文章发布时间，不是岗位截止日期 |
+
+适配器会用详情页标题和 `publicUrl` 校验列表卡片与详情是否配对；不一致时丢弃，避免把日期或正文配错岗位。该站从当前网络直连会重置连接，`pnpm scrape:jobs` 通过 Node 的 `--use-env-proxy` 遵循现有 `HTTP_PROXY` / `HTTPS_PROXY` 配置。
+
+### ReliefWeb
+
+| 项目 | 当前值 |
+| --- | --- |
+| 中国 feed | `GET https://reliefweb.int/jobs/rss.xml?advanced-search=(C58)` |
+| 不限地点 feed | `GET https://reliefweb.int/jobs/rss.xml?view=unspecified-location` |
+| 当前样本 | 2026-10-13 合计 20 条 |
+| 可确认字段 | RSS `title`、`link` / `guid`、`pubDate`、`category`；描述中的机构、国家、截止日期和摘要 |
+| 日期 | `pubDate` 为发布时间；`Closing date` 为截止日期 |
+
+没有调用 `api.reliefweb.int`：该 API 需要预先获批的 `appname`。当前只读取官方公开 RSS，每个 feed 固定返回最新 20 条。
+
+### NGO Job Board
+
+| 项目 | 当前值 |
+| --- | --- |
+| RSS | `GET https://ngojobboard.org/wpjobboard/xml/rss/` |
+| 当前样本 | 2026-10-13 共 8 条 |
+| 可确认字段 | 标题、机构、地点、详情 URL、摘要、`pubDate`、岗位类型与领域分类 |
+| 日期 | `pubDate` 为发布时间；没有结构化截止日期 |
+
+Excel 中的域名写成了 `ngojobsboard.org`，当前有效站点是没有复数 `s` 的 `ngojobboard.org`。适配器只接受该域名下的 `/post/` URL，不请求条目详情；任何包含 `blackhole` 的防爬陷阱链接都会被直接丢弃。
+
 ## 接入其他来源时的记录要求
 
 每个新来源都应在本文新增独立小节，至少记录：
@@ -140,12 +210,28 @@ pnpm scrape:jobs
 
 统一模型应只承诺跨来源真正共有且语义一致的部分。来源专有字段可以保留在来源数据中；无法确认的字段应为空并记录原因，而不是由展示需要反推成“事实”。
 
-## 已调查但尚未接入
+## 2026-10-08 已调查但尚未接入
 
-| 来源 | 当前状态 |
+| 来源 | 未接入原因 |
 | --- | --- |
-| ReliefWeb | API 需要申请获批的 `appname`；获批前未接入 |
-| NGO 英才网 | 调查时连接超时，未接入 |
-| NGO Job Board | 调查时连接超时，未接入 |
+| 民政部社会组织人才服务和培训平台 | 数据匹配度高，但公开页面的 JSON 接口要求按日期生成 `Web-Secret-Key`；当前不复刻该请求签名。 |
+| NGO 英才网 | 代理返回 502，直连被重置。 |
+| 社工中国网 | 页面可抓，但最新招聘更新频率很低，暂不增加低价值详情请求。 |
+| 中国大学生志愿者招募网 | 当前跳转到“站点已过期”。 |
+| 实习僧 | 页面可访问，但结构化 SSR 数据是可执行 JavaScript；当前不执行第三方页面脚本，也不破解字体混淆。 |
+| 猎聘、BOSS 直聘 | robots 禁止带查询参数的搜索页，且接口需要客户端签名或浏览器检测。 |
+| 智联、前程无忧、青团社 | 返回验证码、WAF 或安全校验页。 |
+| 国聘 | 岗位接口要求客户端签名。 |
+| 刺猬 CIWEI | TLS 证书过期，现有站点没有可确认的公开岗位列表。 |
+| 为中国而教 | 只有长期品牌项目和年度招募文章，没有当前结构化职位列表。 |
+| 中国乡村发展基金会 | 招聘列表结构存在，但当前为 0 条。 |
+| 恩派公益、中华慈善总会、联劝网、阿里巴巴公益基金会 | 官网没有当前公开招聘列表。 |
+| 中国青少年发展基金会 | 有公开 JSON API，但当前公告均已截止；不把历史公告混入当前职位快照。 |
+| 深圳市社会公益基金会 | 静态列表没有日期，详情在受验证保护的微信文章中，无法判断是否仍在招。 |
+| 中国红十字基金会 | 只有无日期的长期志愿参与说明，不是职位列表。 |
+| Devex、DevelopmentAid、UN Volunteers | 自动请求被 403 / WAF / Incapsula 拦截。 |
+| UNjobs | robots 对普通客户端禁止全站抓取。 |
+| Idealist、Impactpool | 服务条款明确禁止自动抓取，未接入。 |
+| DevNetJobs、CharityJob | 技术上可抓；前者需要从 sitemap 逐条拉详情，后者以英国本地岗位为主，留作后续低优先级来源。 |
 
-这些状态只代表最近一次实现调查，不代表来源永久不可用。重新接入前需要再次核验访问条件、字段和转载边界。
+这些状态只代表本次少量实时探测，不代表来源永久不可用。重新接入前必须再次核验 robots、使用条款、访问条件、字段、日期语义和转载边界。

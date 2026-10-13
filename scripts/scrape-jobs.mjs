@@ -5,11 +5,13 @@
  * 来源清单：docs/references/公益招聘网站信息库.xlsx（35 个带 URL 的来源）。
  * 当前接入：
  *   1. 中国发展简报 · NGO招聘（chinadevelopmentbrief.org.cn）—— 站内列表接口
+ *   2. 中国公共招聘网（job.mohrss.gov.cn）—— 公开搜索结果页
+ *   3. 壹基金 · 工作机会（onefoundation.cn）—— 机构官网公开职位列表
+ *   4. 美丽中国支教（meilizhongguo.org）—— 机构官网公开职位列表
+ *   5. ReliefWeb（reliefweb.int）—— 官方公开招聘 RSS
+ *   6. NGO Job Board（ngojobboard.org）—— 官方公开招聘 RSS
  *
- * 暂未接入（附原因）：
- *   - ReliefWeb：API 需申请获批 appname（https://apidoc.reliefweb.int/parameters#appname），
- *     且 RSS 端点拒绝非白名单 UA（自定义 UA 返回 406），获批前不抓。
- *   - NGO英才网 / NGO Job Board：本机连接超时，暂不可用。
+ * 其余来源的可抓取性与未接入原因见 docs/data-sources-and-fields.md。
  *
  * 抓取约定（沿用 docs 里的采集规范）：
  *   - 固定可识别 User-Agent；请求间隔 ≥ 1.5s；每来源最多 20 条；
@@ -23,6 +25,9 @@
 import { writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { domesticOrganizationSources } from "./job-sources/domestic-organizations.mjs";
+import { internationalRssSources } from "./job-sources/international-rss.mjs";
+import { publicJobSources } from "./job-sources/public-jobs.mjs";
 
 const ROOT = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const OUT = path.join(ROOT, "src/lib/jobs-scraped.json");
@@ -141,7 +146,10 @@ async function scrapeCDB() {
 
 /* ---------- 主流程 ---------- */
 const sources = [
-  { name: "中国发展简报·NGO招聘", fn: scrapeCDB },
+  { name: "中国发展简报·NGO招聘", scrape: scrapeCDB },
+  ...publicJobSources,
+  ...domesticOrganizationSources,
+  ...internationalRssSources,
 ];
 
 const all = [];
@@ -149,7 +157,16 @@ const report = [];
 for (const [i, src] of sources.entries()) {
   if (i > 0) await sleep(GAP_MS);
   try {
-    const items = await src.fn();
+    const items = await src.scrape({
+      fetchWithUA,
+      ageOf,
+      guessRole,
+      guessVolunteerRole,
+      normalizeJobType,
+      perSource: PER_SOURCE,
+      sleep,
+      userAgent: UA,
+    });
     report.push(`✅ ${src.name}: ${items.length} 条`);
     all.push(...items);
   } catch (err) {
@@ -157,9 +174,29 @@ for (const [i, src] of sources.entries()) {
   }
 }
 
-// 与 mock 数据（id 1-8）错开
-const normalized = all.map((j, idx) => ({ id: 10001 + idx, ...j }));
+function dedupeKey(job) {
+  const text = (value) =>
+    String(value ?? "")
+      .normalize("NFKC")
+      .toLowerCase()
+      .replace(/^【[^】]+】/, "")
+      .replace(/[\s·•—–_()（）\[\]【】]/g, "");
+  return `${text(job.org)}|${text(job.title)}`;
+}
+
+const seenUrls = new Set();
+const seenJobs = new Set();
+const unique = all.filter((job) => {
+  const url = job.url?.trim();
+  const key = dedupeKey(job);
+  if ((url && seenUrls.has(url)) || seenJobs.has(key)) return false;
+  if (url) seenUrls.add(url);
+  seenJobs.add(key);
+  return true;
+});
+
+const normalized = unique.map((job, idx) => ({ id: 10001 + idx, ...job }));
 await writeFile(OUT, JSON.stringify(normalized, null, 2) + "\n", "utf8");
 
 console.log(report.join("\n"));
-console.log(`共 ${normalized.length} 条 → ${path.relative(ROOT, OUT)}`);
+console.log(`去重后共 ${normalized.length} 条 → ${path.relative(ROOT, OUT)}`);
