@@ -14,10 +14,12 @@
 
 ## Database
 
-- Postgres (Neon) via Prisma 7 driver adapter `@prisma/adapter-pg`; connection string comes from `DATABASE_URL`. Schema is in `prisma/schema.prisma`; connection config (not the schema file) holds the URL in `prisma.config.ts`.
-- Local development uses `prisma dev` (local Postgres over PGlite): `pnpm exec prisma dev -n default -d` starts it, then put the printed `postgres://...` URL in `.env` as `DATABASE_URL`. Stop/remove with `pnpm exec prisma dev rm default --force`.
-- After changing the schema run `pnpm exec prisma migrate dev --name <change>` locally, then apply to production with `DATABASE_URL=<prod-url> pnpm exec prisma migrate deploy`.
+- Postgres is Neon (Lakebase Postgres), project `infinite` (`aged-salad-01807168`, org `org-calm-darkness-32466000`, branch `production`), region aws-ap-southeast-1. The repo is linked via the gitignored `.neon` file; `neon.ts` declares services (auth stays off — Auth.js owns login).
+- Prisma 7 driver adapter `@prisma/adapter-pg` connects with `DATABASE_URL`. Neon pulls pooled (`DATABASE_URL`) and direct (`DATABASE_URL_UNPOOLED`) strings into `.env`: use the **pooled** URL for app traffic and the **direct** URL for migrations (`DATABASE_URL=<direct> pnpm exec prisma migrate deploy`) and admin tasks.
+- Local development: `pnpm exec prisma dev -n default -d` starts a local Postgres (PGlite); put its printed URL in `.env` as `DATABASE_URL`. Or use a Neon branch: `neon checkout dev-<name> --create` pulls that branch's `DATABASE_URL` into `.env`.
+- After changing `prisma/schema.prisma` run `pnpm exec prisma migrate dev --name <change>` locally, then apply to production with `DATABASE_URL=<prod-direct-url> pnpm exec prisma migrate deploy`.
 - Auth uses Auth.js v5 (`next-auth@beta`) with a Credentials provider and JWT sessions; user records are in the `User` table.
+- The Neon agent skill `neon-postgres` is installed at `.claude/skills/` (tracked, shared with any agent); consult it for connection/driver/branching best practices.
 
 
 <!-- BEGIN:nextjs-agent-rules -->
