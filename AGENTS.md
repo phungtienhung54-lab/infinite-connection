@@ -15,6 +15,7 @@
 ## Database
 
 - Postgres (Neon) via Prisma 7 driver adapter `@prisma/adapter-pg`; connection string comes from `DATABASE_URL`. Schema is in `prisma/schema.prisma`; connection config (not the schema file) holds the URL in `prisma.config.ts`.
+- Local development uses `prisma dev` (local Postgres over PGlite): `pnpm exec prisma dev -n default -d` starts it, then put the printed `postgres://...` URL in `.env` as `DATABASE_URL`. Stop/remove with `pnpm exec prisma dev rm default --force`.
 - After changing the schema run `pnpm exec prisma migrate dev --name <change>` locally, then apply to production with `DATABASE_URL=<prod-url> pnpm exec prisma migrate deploy`.
 - Auth uses Auth.js v5 (`next-auth@beta`) with a Credentials provider and JWT sessions; user records are in the `User` table.
 
