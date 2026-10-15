@@ -261,18 +261,18 @@ export const updates: UpdateItem[] = [
 ];
 
 export const hotProjects = [
-  { rank: 1, title: "蚂蚁森林·阿拉善梭梭种植", meta: "互动 1.5k · 评分 4.8" },
-  { rank: 2, title: "美丽中国支教招募", meta: "互动 1.1k · 评分 4.9" },
-  { rank: 3, title: "心智障碍青年就业", meta: "互动 866 · 评分 4.7" },
-  { rank: 4, title: "留守儿童心理健康", meta: "互动 945 · 评分 4.8" },
-  { rank: 5, title: "全国沿海净滩行动", meta: "互动 1.3k · 评分 4.6" },
+  { rank: 1, title: "蚂蚁森林·阿拉善梭梭种植", meta: "互动 0 · 评分 0" },
+  { rank: 2, title: "美丽中国支教招募", meta: "互动 0 · 评分 0" },
+  { rank: 3, title: "心智障碍青年就业", meta: "互动 0 · 评分 0" },
+  { rank: 4, title: "留守儿童心理健康", meta: "互动 0 · 评分 0" },
+  { rank: 5, title: "全国沿海净滩行动", meta: "互动 0 · 评分 0" },
 ];
 
 export const platformStats = [
-  { label: "在线项目", value: "428", tone: "green" },
-  { label: "累计动态", value: "3,256", tone: "orange" },
-  { label: "活跃机构", value: "286", tone: "blue" },
-  { label: "参与用户", value: "12.8k", tone: "purple" },
+  { label: "在线项目", value: "0", tone: "green" },
+  { label: "累计动态", value: "0", tone: "orange" },
+  { label: "活跃机构", value: "0", tone: "blue" },
+  { label: "参与用户", value: "0", tone: "purple" },
 ];
 
 /* ---------- 资金 & 物资 ---------- */
@@ -487,20 +487,6 @@ export const fundings: FundingItem[] = [
     due: "2026-09-28",
     publishedDays: 1,
   },
-];
-
-export const urgentFundings = [
-  { title: "银杏成长计划", org: "南都基金会 · 乡村教育", due: "3天后截止" },
-  { title: "朝阳社工服务购买", org: "朝阳民政局 · 社会工作", due: "7天后截止" },
-  { title: "壹基金海洋公益", org: "壹基金 · 海洋保护", due: "9天后截止" },
-  { title: "万科社区营造", org: "万科基金会 · 社区", due: "15天后截止" },
-];
-
-export const fundingStats = [
-  { label: "本月新增", value: "428" },
-  { label: "本月截止", value: "156" },
-  { label: "累计资助额", value: "8.6亿+" },
-  { label: "活跃资助方", value: "286" },
 ];
 
 /* ---------- 人力 & 专家 ---------- */
@@ -725,12 +711,6 @@ export const tools: ToolItem[] = [
 
 /* ---------- 筛选配置 ---------- */
 
-export const fundingTabs = [
-  { label: "最新资助", icon: "💰", count: "1,825" },
-  { label: "最新需求", icon: "📋", count: "486" },
-  { label: "物资供需", icon: "📦", count: "218" },
-];
-
 export const toolTabs = [
   { label: "全部", icon: "", count: "3,256" },
   { label: "培训课程", icon: "🎓", count: "286" },
@@ -807,7 +787,6 @@ export const filterGroups = {
     "合作共建",
     "物资资助",
   ],
-  fundingSupportTypes: ["全部", "资金", "物资"],
   fundingDurations: ["全部", "6个月内", "6-12个月", "1-2年", "2年以上"],
   fundingFields: ["全部", ...publicInterestFields],
   fundingRegions: ["全部", ...provinceOptions],

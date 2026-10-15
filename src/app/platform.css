@@ -251,6 +251,29 @@
   font-size: 14px;
 }
 
+.feed-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.feed-tabs button {
+  padding: 8px 14px;
+  border: 1px solid var(--pc-border);
+  border-radius: 999px;
+  background: var(--pc-card);
+  color: var(--pc-text-3);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.feed-tabs button.active {
+  border-color: var(--pc-primary);
+  background: var(--pc-primary-tint);
+  color: var(--pc-primary);
+  font-weight: 600;
+}
+
 /* ---------- 筛选面板 ---------- */
 .filter-panel {
   display: flex;
@@ -867,6 +890,12 @@
   flex-direction: column;
   gap: 10px;
   transition: box-shadow 0.15s, transform 0.15s;
+}
+
+.feed-list {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 16px;
 }
 
 .feed-card:hover {
