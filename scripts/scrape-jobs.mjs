@@ -1,0 +1,202 @@
+#!/usr/bin/env node
+/**
+ * 招聘数据抓取脚本（预览用）
+ *
+ * 来源清单：docs/references/公益招聘网站信息库.xlsx（35 个带 URL 的来源）。
+ * 当前接入：
+ *   1. 中国发展简报 · NGO招聘（chinadevelopmentbrief.org.cn）—— 站内列表接口
+ *   2. 中国公共招聘网（job.mohrss.gov.cn）—— 公开搜索结果页
+ *   3. 壹基金 · 工作机会（onefoundation.cn）—— 机构官网公开职位列表
+ *   4. 美丽中国支教（meilizhongguo.org）—— 机构官网公开职位列表
+ *   5. ReliefWeb（reliefweb.int）—— 官方公开招聘 RSS
+ *   6. NGO Job Board（ngojobboard.org）—— 官方公开招聘 RSS
+ *
+ * 其余来源的可抓取性与未接入原因见 docs/data-sources-and-fields.md。
+ *
+ * 抓取约定（沿用 docs 里的采集规范）：
+ *   - 固定可识别 User-Agent；请求间隔 ≥ 1.5s；每来源最多 20 条；
+ *   - 遇到 401/403/429 直接标记失败跳过，不绕过；
+ *   - 只保存事实性摘要 + 原始链接，投递跳转原站。
+ *
+ * 用法：node scripts/scrape-jobs.mjs
+ * 输出：src/lib/jobs-scraped.json（JobsBrowser 直接 import）
+ */
+
+import { writeFile } from "node:fs/promises";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import { domesticOrganizationSources } from "./job-sources/domestic-organizations.mjs";
+import { internationalRssSources } from "./job-sources/international-rss.mjs";
+import { publicJobSources } from "./job-sources/public-jobs.mjs";
+
+const ROOT = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
+const OUT = path.join(ROOT, "src/lib/jobs-scraped.json");
+const UA = "InfiniteConnectionPreview/0.1 (+https://github.com/schneiderlin/infinite-connection)";
+const PER_SOURCE = 20;
+const GAP_MS = 1500;
+
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+async function fetchWithUA(url, options = {}) {
+  const res = await fetch(url, {
+    ...options,
+    headers: { "User-Agent": UA, ...(options.headers ?? {}) },
+    signal: AbortSignal.timeout(20_000),
+  });
+  if (res.status === 401 || res.status === 403 || res.status === 429) {
+    throw new Error(`blocked: HTTP ${res.status}`);
+  }
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res;
+}
+
+/** 发布距今的天数与展示文案 */
+function ageOf(dateStr) {
+  const then = new Date(dateStr).getTime();
+  if (Number.isNaN(then)) return { publishedDays: 0, time: "近期发布" };
+  const days = Math.max(0, Math.round((Date.now() - then) / 86_400_000));
+  const time =
+    days === 0 ? "今天发布" : days === 1 ? "昨天发布" : days < 7 ? `${days}天前发布` : days < 30 ? `${Math.floor(days / 7)}周前发布` : `${Math.floor(days / 30)}个月前发布`;
+  return { publishedDays: days, time };
+}
+
+/** 职能关键词归类到站内职能标签 */
+function guessRole(text) {
+  const t = text.toLowerCase();
+  if (/传播|沟通|品牌|媒体|communication|media/.test(t)) return "传播";
+  if (/财务|会计|finance|account/.test(t)) return "财务";
+  if (/人力|招聘|hr\b|human resource/.test(t)) return "人力资源";
+  if (/总监|主任|负责人|高级管理|director|manager/.test(t)) return "高级管理";
+  if (/督导|supervisor/.test(t)) return "督导";
+  if (/筹款|募捐|fundraising|donor/.test(t)) return "筹款";
+  if (/法务|法律|legal/.test(t)) return "法务";
+  if (/研究|调研|research|analyst/.test(t)) return "研究";
+  if (/项目|program|project|officer/.test(t)) return "项目官员";
+  return "其他";
+}
+
+function guessVolunteerRole(text) {
+  const t = text.toLowerCase();
+  if (/技术|开发|工程|technology|developer|engineer/.test(t)) return "技术开发";
+  if (/评估|测评|evaluation|assessment/.test(t)) return "评估";
+  if (/传播|沟通|品牌|媒体|communication|media/.test(t)) return "传播";
+  if (/人力|招聘|hr\b|human resource/.test(t)) return "人力资源";
+  if (/督导|supervisor/.test(t)) return "督导";
+  if (/筹款|募捐|fundraising|donor/.test(t)) return "筹款";
+  if (/法务|法律|legal/.test(t)) return "法务";
+  if (/研究|调研|research/.test(t)) return "研究";
+  if (/活动|event/.test(t)) return "活动执行";
+  return "项目执行";
+}
+
+function normalizeJobType(sourceType, title) {
+  if (/志愿/.test(sourceType)) return { category: "志愿者招募", kind: "志愿者" };
+  if (/实习/.test(sourceType) || /实习|intern/i.test(title)) return { category: "人员招聘", kind: "实习" };
+  if (/兼职/.test(sourceType) || /兼职|part[\s-]?time/i.test(title)) return { category: "人员招聘", kind: "兼职" };
+  return { category: "人员招聘", kind: "全职" };
+}
+
+/* ---------- 来源 1：中国发展简报 · NGO招聘 ---------- */
+async function scrapeCDB() {
+  const res = await fetchWithUA("https://www.chinadevelopmentbrief.org.cn/search/jobs/getData", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: `search=0&pageNum=1&pageSize=${PER_SOURCE}`,
+  });
+  const data = await res.json();
+  if (data.code !== 200) throw new Error(`API code ${data.code}`);
+  const list = data.result?.list ?? [];
+  return list.slice(0, PER_SOURCE).map((j) => {
+    const jobType = normalizeJobType(j.type ?? "", j.title ?? "");
+    const remote = j.jobModel === "YCBG";
+    // 直辖市时 cityName 已包含省份（“北京·北京市” → “北京市”）
+    const prov = (j.provinceName ?? "").replace(/[省市]$/, "");
+    const joined =
+      j.cityName && prov && j.cityName.startsWith(prov)
+        ? j.cityName
+        : [j.provinceName, j.cityName].filter(Boolean).join("·");
+    const location = remote ? "远程办公" : joined || "全国";
+    const salary =
+      j.salaryBegin && j.salaryBegin !== "面议" && j.salaryEnd
+        ? `${j.salaryBegin}-${j.salaryEnd}`
+        : "面议";
+    const requirements = [j.experience, j.educationValue].filter(Boolean).join("，");
+    const summary =
+      [j.companyDomains ? `机构领域：${j.companyDomains}` : "", requirements ? `要求：${requirements}。` : ""]
+        .filter(Boolean)
+        .join("；") || "点击查看原始招聘详情。";
+    return {
+      ...jobType,
+      role:
+        jobType.category === "志愿者招募"
+          ? guessVolunteerRole(`${j.postName ?? ""} ${j.title}`)
+          : guessRole(`${j.postName ?? ""} ${j.title}`),
+      ...ageOf(j.updateTime),
+      title: `【${jobType.category === "志愿者招募" ? "志愿者" : "招聘"}】${j.title} · ${j.companyName}`,
+      summary,
+      org: j.companyName ?? "未知机构",
+      location,
+      salary: jobType.category === "志愿者招募" && salary === "面议" ? "志愿服务" : salary,
+      due: "详见原帖",
+      sourceName: "中国发展简报·NGO招聘",
+      url: `https://www.chinadevelopmentbrief.org.cn/jobs/detail/${j.id}.html`,
+    };
+  });
+}
+
+/* ---------- 主流程 ---------- */
+const sources = [
+  { name: "中国发展简报·NGO招聘", scrape: scrapeCDB },
+  ...publicJobSources,
+  ...domesticOrganizationSources,
+  ...internationalRssSources,
+];
+
+const all = [];
+const report = [];
+for (const [i, src] of sources.entries()) {
+  if (i > 0) await sleep(GAP_MS);
+  try {
+    const items = await src.scrape({
+      fetchWithUA,
+      ageOf,
+      guessRole,
+      guessVolunteerRole,
+      normalizeJobType,
+      perSource: PER_SOURCE,
+      sleep,
+      userAgent: UA,
+    });
+    report.push(`✅ ${src.name}: ${items.length} 条`);
+    all.push(...items);
+  } catch (err) {
+    report.push(`❌ ${src.name}: ${err.message}`);
+  }
+}
+
+function dedupeKey(job) {
+  const text = (value) =>
+    String(value ?? "")
+      .normalize("NFKC")
+      .toLowerCase()
+      .replace(/^【[^】]+】/, "")
+      .replace(/[\s·•—–_()（）\[\]【】]/g, "");
+  return `${text(job.org)}|${text(job.title)}`;
+}
+
+const seenUrls = new Set();
+const seenJobs = new Set();
+const unique = all.filter((job) => {
+  const url = job.url?.trim();
+  const key = dedupeKey(job);
+  if ((url && seenUrls.has(url)) || seenJobs.has(key)) return false;
+  if (url) seenUrls.add(url);
+  seenJobs.add(key);
+  return true;
+});
+
+const normalized = unique.map((job, idx) => ({ id: 10001 + idx, ...job }));
+await writeFile(OUT, JSON.stringify(normalized, null, 2) + "\n", "utf8");
+
+console.log(report.join("\n"));
+console.log(`去重后共 ${normalized.length} 条 → ${path.relative(ROOT, OUT)}`);

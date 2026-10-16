@@ -3,10 +3,7 @@
 import { useMemo, useState } from "react";
 import {
   fundings,
-  fundingTabs,
   filterGroups,
-  urgentFundings,
-  fundingStats,
   type FundingItem,
 } from "@/lib/platform-data";
 import {
@@ -23,10 +20,11 @@ const sorts = [
   { key: "new", label: "最新发布" },
 ];
 
-const tabToKind: Record<string, FundingItem["kind"]> = {
-  最新资助: "资助",
-  最新需求: "需求",
-  物资供需: "物资",
+const fundingTabs = [{ label: "资金资助" }, { label: "物资资助" }];
+
+const tabToSupportType: Record<string, FundingItem["supportType"]> = {
+  资金资助: "资金",
+  物资资助: "物资",
 };
 
 function regionMatch(region: string, itemRegion: string): boolean {
@@ -40,9 +38,8 @@ const kindTagClass: Record<string, string> = {
 };
 
 export function FundingBrowser() {
-  const [tab, setTab] = useState("最新资助");
+  const [tab, setTab] = useState("资金资助");
   const [resourceType, setResourceType] = useState("全部");
-  const [supportType, setSupportType] = useState("全部");
   const [duration, setDuration] = useState("全部");
   const [field, setField] = useState("全部");
   const [region, setRegion] = useState("全部");
@@ -52,14 +49,14 @@ export function FundingBrowser() {
 
   const filtered = useMemo(() => {
     const q = search.trim();
-    const selectedKind = other === "只看资助" ? "资助" : other === "只看需求" ? "需求" : tabToKind[tab];
-    const showFundingFilters = selectedKind === "资助";
+    const selectedSupportType = tabToSupportType[tab];
     const list = fundings.filter(
       (f) =>
-        f.kind === selectedKind &&
-        (!showFundingFilters || resourceType === "全部" || f.type === resourceType) &&
-        (!showFundingFilters || supportType === "全部" || f.supportType === supportType) &&
-        (!showFundingFilters || duration === "全部" || f.duration === duration) &&
+        f.supportType === selectedSupportType &&
+        (other !== "只看资助" || f.kind === "资助") &&
+        (other !== "只看需求" || f.kind === "需求" || f.kind === "物资") &&
+        (resourceType === "全部" || f.type === resourceType) &&
+        (duration === "全部" || f.duration === duration) &&
         (field === "全部" || f.field === field) &&
         regionMatch(region, f.region) &&
         (other !== "最新发布（一周内）" || f.publishedDays <= 7) &&
@@ -71,11 +68,10 @@ export function FundingBrowser() {
       new: (a: FundingItem, b: FundingItem) => a.publishedDays - b.publishedDays,
     }[sort];
     return [...list].sort(by);
-  }, [tab, resourceType, supportType, duration, field, region, other, search, sort]);
+  }, [tab, resourceType, duration, field, region, other, search, sort]);
 
   const resetFilters = () => {
     setResourceType("全部");
-    setSupportType("全部");
     setDuration("全部");
     setField("全部");
     setRegion("全部");
@@ -90,9 +86,17 @@ export function FundingBrowser() {
 
   const changeOther = (next: string) => {
     setOther(next);
-    if (next === "只看资助") setTab("最新资助");
-    if (next === "只看需求") setTab("最新需求");
   };
+
+  const urgentFundings = fundings
+    .filter((funding) => funding.dueDays <= 7)
+    .sort((a, b) => a.dueDays - b.dueDays);
+  const fundingStats = [
+    { label: "当前收录", value: String(fundings.length) },
+    { label: "资金资助", value: String(fundings.filter((funding) => funding.supportType === "资金").length) },
+    { label: "物资资助", value: String(fundings.filter((funding) => funding.supportType === "物资").length) },
+    { label: "发布机构", value: String(new Set(fundings.map((funding) => funding.org)).size) },
+  ];
 
   return (
     <div className="module-body">
@@ -100,7 +104,7 @@ export function FundingBrowser() {
         <TypeTabs tabs={fundingTabs} active={tab} onChange={changeTab} />
 
         <div className="filter-panel">
-          {tab === "最新资助" && (
+          {tab === "资金资助" && (
             <>
               <div className="pc-card filter-box">
                 <FilterRow
@@ -108,14 +112,6 @@ export function FundingBrowser() {
                   options={filterGroups.fundingResourceTypes}
                   active={resourceType}
                   onChange={setResourceType}
-                />
-              </div>
-              <div className="pc-card filter-box">
-                <FilterRow
-                  label="资助类型"
-                  options={filterGroups.fundingSupportTypes}
-                  active={supportType}
-                  onChange={setSupportType}
                 />
               </div>
               <div className="pc-card filter-box">
@@ -147,8 +143,8 @@ export function FundingBrowser() {
         </div>
 
         <ListMeta
-          total={1825}
-          unit="条资助征集"
+          total={fundings.filter((funding) => funding.supportType === tabToSupportType[tab]).length}
+          unit={`条${tab}`}
           shown={filtered.length}
           sorts={sorts}
           activeSort={sort}
@@ -195,8 +191,8 @@ export function FundingBrowser() {
             {urgentFundings.map((u) => (
               <li key={u.title}>
                 <span className="u-title">{u.title}</span>
-                <span className="u-org">{u.org}</span>
-                <span className="u-due">⏰ {u.due}</span>
+                <span className="u-org">{u.org} · {u.field}</span>
+                <span className="u-due">⏰ {u.dueDays}天后截止</span>
               </li>
             ))}
           </ul>

@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { auth } from "@/auth";
+import { UserMenu } from "./UserMenu";
 
 const navItems = [
   { label: "项目动态", href: "/updates" },
@@ -7,7 +9,10 @@ const navItems = [
   { label: "能力工具", href: "/tools" },
 ];
 
-export function SiteHeader({ active }: { active: string }) {
+export async function SiteHeader({ active }: { active: string }) {
+  const session = await auth();
+  const displayName = session?.user?.name ?? session?.user?.email ?? "";
+
   return (
     <header className="site-header">
       <div className="site-header-inner">
@@ -35,12 +40,18 @@ export function SiteHeader({ active }: { active: string }) {
           })}
         </nav>
         <div className="header-actions">
-          <button className="btn-ghost" type="button">
-            登录
-          </button>
-          <button className="btn-primary" type="button">
-            免费注册
-          </button>
+          {session?.user ? (
+            <UserMenu name={displayName} />
+          ) : (
+            <>
+              <Link href="/login" className="btn-ghost">
+                登录
+              </Link>
+              <Link href="/register" className="btn-primary">
+                免费注册
+              </Link>
+            </>
+          )}
         </div>
       </div>
     </header>

@@ -11,7 +11,6 @@ import {
 import {
   FilterRow,
   SearchInput,
-  ListMeta,
   EmptyState,
   formatCount,
 } from "./platform-ui";
@@ -50,7 +49,7 @@ const publishFields = [
 ];
 
 export function UpdatesBrowser() {
-  const [items, setItems] = useState<UpdateItem[]>(initialUpdates);
+  const [items, setItems] = useState<UpdateItem[]>(initialUpdates.slice(0, 1));
   const [field, setField] = useState("全部");
   const [region, setRegion] = useState("全部");
   const [search, setSearch] = useState("");
@@ -133,25 +132,17 @@ export function UpdatesBrowser() {
   return (
     <div className="module-body">
       <div className="module-main">
-        <div className="filter-panel">
-          <div className="pc-card filter-box">
-            <FilterRow label="领域" options={filterGroups.fields} active={field} onChange={setField} />
-          </div>
-          <div className="pc-card filter-box">
-            <FilterRow label="地域" options={filterGroups.regions} active={region} onChange={setRegion}>
-              <SearchInput value={search} onChange={setSearch} placeholder="搜索项目名称、机构、关键词…" />
-            </FilterRow>
-          </div>
-        </div>
-
-        <ListMeta
-          total={428}
-          unit="个项目动态"
-          shown={filtered.length}
-          sorts={sorts}
-          activeSort={sort}
-          onSort={setSort}
-        >
+        <div className="feed-tabs" aria-label="动态排序与发布者筛选">
+          {sorts.map((item) => (
+            <button
+              key={item.key}
+              type="button"
+              className={sort === item.key ? "active" : ""}
+              onClick={() => setSort(item.key)}
+            >
+              {item.label}
+            </button>
+          ))}
           <button
             type="button"
             className={poster === "机构" ? "active" : ""}
@@ -166,12 +157,23 @@ export function UpdatesBrowser() {
           >
             只看个人
           </button>
-        </ListMeta>
+        </div>
+
+        <div className="filter-panel">
+          <div className="pc-card filter-box">
+            <FilterRow label="领域" options={filterGroups.fields} active={field} onChange={setField} />
+          </div>
+          <div className="pc-card filter-box">
+            <FilterRow label="地域" options={filterGroups.regions} active={region} onChange={setRegion}>
+              <SearchInput value={search} onChange={setSearch} placeholder="搜索项目名称、机构、关键词…" />
+            </FilterRow>
+          </div>
+        </div>
 
         {filtered.length === 0 ? (
           <EmptyState onReset={resetFilters} />
         ) : (
-          <div className="card-grid-2">
+          <div className="feed-list">
             {filtered.map((u) => (
               <article key={u.id} className="pc-card feed-card">
                 <div className="card-head">
