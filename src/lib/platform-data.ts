@@ -40,7 +40,7 @@ export type UpdateItem = {
 
 export const updates: UpdateItem[] = [
   {
-    id: 1,
+    id: "1",
     kind: "最新动态",
     posterType: "机构",
     field: "生态环保",
@@ -63,7 +63,7 @@ export const updates: UpdateItem[] = [
     helps: 312,
   },
   {
-    id: 2,
+    id: "2",
     kind: "最新动态",
     posterType: "机构",
     field: "乡村教育",
@@ -85,7 +85,7 @@ export const updates: UpdateItem[] = [
     helps: 204,
   },
   {
-    id: 3,
+    id: "3",
     kind: "项目主页",
     posterType: "机构",
     field: "残障融合",
@@ -108,7 +108,7 @@ export const updates: UpdateItem[] = [
     helps: 168,
   },
   {
-    id: 4,
+    id: "4",
     kind: "项目主页",
     posterType: "机构",
     field: "儿童保护",
@@ -130,7 +130,7 @@ export const updates: UpdateItem[] = [
     helps: 245,
   },
   {
-    id: 5,
+    id: "5",
     kind: "最新动态",
     posterType: "机构",
     field: "老龄关怀",
@@ -152,7 +152,7 @@ export const updates: UpdateItem[] = [
     helps: 97,
   },
   {
-    id: 6,
+    id: "6",
     kind: "项目主页",
     posterType: "机构",
     field: "医疗健康",
@@ -175,7 +175,7 @@ export const updates: UpdateItem[] = [
     helps: 386,
   },
   {
-    id: 7,
+    id: "7",
     kind: "志愿活动",
     posterType: "机构",
     field: "生态环保",
@@ -198,7 +198,7 @@ export const updates: UpdateItem[] = [
     helps: 421,
   },
   {
-    id: 8,
+    id: "8",
     kind: "志愿活动",
     posterType: "机构",
     field: "残障融合",
@@ -220,7 +220,7 @@ export const updates: UpdateItem[] = [
     helps: 356,
   },
   {
-    id: 9,
+    id: "9",
     kind: "行业活动",
     posterType: "机构",
     field: "乡村教育",
@@ -242,7 +242,7 @@ export const updates: UpdateItem[] = [
     helps: 89,
   },
   {
-    id: 10,
+    id: "10",
     kind: "志愿活动",
     posterType: "机构",
     field: "乡村教育",
