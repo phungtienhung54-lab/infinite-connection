@@ -1,5 +1,5 @@
 "use client";
-
+import Link from "next/link";
 import { useMemo, useState } from "react";
 import {
   updates as initialUpdates,
@@ -15,6 +15,7 @@ import {
   formatCount,
 } from "./platform-ui";
 import { PublishDialog } from "./PublishDialog";
+
 
 const sorts = [
   { key: "new", label: "最新发布（3天内）" },
@@ -54,9 +55,9 @@ export function UpdatesBrowser() {
   const [search, setSearch] = useState("");
   const [sort, setSort] = useState("new");
   const [poster, setPoster] = useState<"全部" | "机构" | "个人">("全部");
-  const [liked, setLiked] = useState<Set<number>>(new Set());
-  const [helped, setHelped] = useState<Set<number>>(new Set());
-  const [shared, setShared] = useState<Set<number>>(new Set());
+  const [liked, setLiked] = useState<Set<string>>(new Set());
+  const [helped, setHelped] = useState<Set<string>>(new Set());
+  const [shared, setShared] = useState<Set<string>>(new Set());
   const [dialogOpen, setDialogOpen] = useState(false);
 
   const filtered = useMemo(() => {
@@ -84,7 +85,7 @@ export function UpdatesBrowser() {
     return [...list].sort(by);
   }, [items, field, region, search, sort, poster]);
 
-  const bump = (set: Set<number>, setSet: (s: Set<number>) => void, id: number) => {
+  const bump = (set: Set<string>, setSet: (s: Set<string>) => void, id: string) => {
     const next = new Set(set);
     if (next.has(id)) next.delete(id);
     else next.add(id);
@@ -100,7 +101,7 @@ export function UpdatesBrowser() {
 
   const publish = (values: Record<string, string>) => {
     const item: UpdateItem = {
-      id: Date.now(),
+      id: `user-${Date.now()}`,
       kind: "最新动态",
       posterType: "个人",
       field: values.field || "乡村教育",
@@ -220,9 +221,9 @@ export function UpdatesBrowser() {
                 <div className="card-meta feed-meta-row">
                   <span className="item">📍 {u.location}</span>
                   <span className="item">🕐 项目期：{u.period}</span>
-                  <a className="card-link" href="#">
+                  <Link href={`/updates/${u.id}`} className="card-link">
                     进入项目主页 →
-                  </a>
+                  </Link>
                 </div>
 
                 <div className="feed-actions">
