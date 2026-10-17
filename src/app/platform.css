@@ -257,6 +257,11 @@
   gap: 8px;
 }
 
+.filter-row .feed-tabs {
+  flex: 1;
+  align-items: center;
+}
+
 .feed-tabs button {
   padding: 8px 14px;
   border: 1px solid var(--pc-border);
@@ -673,6 +678,10 @@
   color: var(--pc-text);
 }
 
+.urgent-list a.u-title:hover {
+  color: var(--pc-primary);
+}
+
 .urgent-list .u-org {
   font-size: 12px;
   color: var(--pc-text-3);
@@ -683,17 +692,10 @@
   color: var(--pc-pink-text);
 }
 
-.urgent-more {
-  margin-top: 16px;
-  width: 100%;
-  background: #fff;
-  border: 1px solid #eee3b0;
-  border-radius: 10px;
-  padding: 10px;
+.urgent-empty {
+  color: var(--pc-text-3);
   font-size: 13px;
-  font-weight: 600;
-  color: #8a6d1a;
-  cursor: pointer;
+  line-height: 1.6;
 }
 
 .stat-rows {

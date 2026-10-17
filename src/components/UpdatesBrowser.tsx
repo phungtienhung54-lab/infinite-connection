@@ -132,41 +132,44 @@ export function UpdatesBrowser() {
   return (
     <div className="module-body">
       <div className="module-main">
-        <div className="feed-tabs" aria-label="动态排序与发布者筛选">
-          {sorts.map((item) => (
-            <button
-              key={item.key}
-              type="button"
-              className={sort === item.key ? "active" : ""}
-              onClick={() => setSort(item.key)}
-            >
-              {item.label}
-            </button>
-          ))}
-          <button
-            type="button"
-            className={poster === "机构" ? "active" : ""}
-            onClick={() => setPoster(poster === "机构" ? "全部" : "机构")}
-          >
-            只看组织
-          </button>
-          <button
-            type="button"
-            className={poster === "个人" ? "active" : ""}
-            onClick={() => setPoster(poster === "个人" ? "全部" : "个人")}
-          >
-            只看个人
-          </button>
-        </div>
-
         <div className="filter-panel">
           <div className="pc-card filter-box">
             <FilterRow label="领域" options={filterGroups.fields} active={field} onChange={setField} />
           </div>
           <div className="pc-card filter-box">
-            <FilterRow label="地域" options={filterGroups.regions} active={region} onChange={setRegion}>
-              <SearchInput value={search} onChange={setSearch} placeholder="搜索项目名称、机构、关键词…" />
-            </FilterRow>
+            <FilterRow label="地域" options={filterGroups.regions} active={region} onChange={setRegion} />
+          </div>
+          <div className="pc-card filter-box">
+            <div className="filter-row">
+              <span className="filter-label">筛选</span>
+              <div className="feed-tabs" aria-label="动态排序与发布者筛选">
+                {sorts.map((item) => (
+                  <button
+                    key={item.key}
+                    type="button"
+                    className={sort === item.key ? "active" : ""}
+                    onClick={() => setSort(item.key)}
+                  >
+                    {item.label}
+                  </button>
+                ))}
+                <button
+                  type="button"
+                  className={poster === "机构" ? "active" : ""}
+                  onClick={() => setPoster(poster === "机构" ? "全部" : "机构")}
+                >
+                  只看组织
+                </button>
+                <button
+                  type="button"
+                  className={poster === "个人" ? "active" : ""}
+                  onClick={() => setPoster(poster === "个人" ? "全部" : "个人")}
+                >
+                  只看个人
+                </button>
+                <SearchInput value={search} onChange={setSearch} placeholder="搜索项目名称、机构、关键词…" />
+              </div>
+            </div>
           </div>
         </div>
 

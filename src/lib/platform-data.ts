@@ -299,6 +299,7 @@ export type FundingItem = {
   dueDays: number;
   due: string;
   publishedDays: number;
+  url: string;
 };
 
 export const fundings: FundingItem[] = fundingsData as unknown as FundingItem[];
@@ -795,7 +796,6 @@ export const filterGroups = {
     "政府购买",
     "企业CSR",
     "合作共建",
-    "物资资助",
   ],
   fundingDurations: ["全部", "6个月内", "6-12个月", "1-2年", "2年以上"],
   fundingFields: ["全部", ...publicInterestFields],

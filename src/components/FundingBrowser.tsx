@@ -63,7 +63,8 @@ export function FundingBrowser() {
         (!q || f.title.includes(q) || f.org.includes(q) || f.summary.includes(q)),
     );
     const by = {
-      due: (a: FundingItem, b: FundingItem) => a.dueDays - b.dueDays,
+      due: (a: FundingItem, b: FundingItem) =>
+        (a.dueDays || Number.POSITIVE_INFINITY) - (b.dueDays || Number.POSITIVE_INFINITY),
       amount: (a: FundingItem, b: FundingItem) => b.amountWan - a.amountWan,
       new: (a: FundingItem, b: FundingItem) => a.publishedDays - b.publishedDays,
     }[sort];
@@ -89,8 +90,9 @@ export function FundingBrowser() {
   };
 
   const urgentFundings = fundings
-    .filter((funding) => funding.dueDays <= 7)
-    .sort((a, b) => a.dueDays - b.dueDays);
+    .filter((funding) => funding.dueDays > 0 && funding.dueDays <= 7)
+    .sort((a, b) => a.dueDays - b.dueDays)
+    .slice(0, 3);
   const fundingStats = [
     { label: "当前收录", value: String(fundings.length) },
     { label: "资金资助", value: String(fundings.filter((funding) => funding.supportType === "资金").length) },
@@ -174,8 +176,8 @@ export function FundingBrowser() {
                 </div>
                 <div className="card-foot">
                   <span className="stat">📅 截止 {f.due}</span>
-                  <a className="card-link" href="#">
-                    {f.kind === "资助" ? "申报指南 →" : "查看详情 →"}
+                  <a className="card-link" href={f.url} target="_blank" rel="noreferrer">
+                    查看来源 →
                   </a>
                 </div>
               </article>
@@ -187,18 +189,21 @@ export function FundingBrowser() {
       <aside className="module-aside">
         <div className="urgent-card">
           <h2 className="aside-title">🚨 7天内截止</h2>
-          <ul className="urgent-list">
-            {urgentFundings.map((u) => (
-              <li key={u.title}>
-                <span className="u-title">{u.title}</span>
-                <span className="u-org">{u.org} · {u.field}</span>
-                <span className="u-due">⏰ {u.dueDays}天后截止</span>
-              </li>
-            ))}
-          </ul>
-          <button className="urgent-more" type="button">
-            查看全部紧急 →
-          </button>
+          {urgentFundings.length > 0 ? (
+            <ul className="urgent-list">
+              {urgentFundings.map((u) => (
+                <li key={u.id}>
+                  <a className="u-title" href={u.url} target="_blank" rel="noreferrer">
+                    {u.title}
+                  </a>
+                  <span className="u-org">{u.org} · {u.field}</span>
+                  <span className="u-due">⏰ {u.dueDays}天后截止</span>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="urgent-empty">当前数据中暂无明确在 7 天内截止的项目</p>
+          )}
         </div>
 
         <div className="aside-card">
