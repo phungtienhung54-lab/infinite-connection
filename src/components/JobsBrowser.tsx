@@ -1,10 +1,10 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import Link from "next/link";
 import { filterGroups, type JobItem } from "@/lib/platform-data";
 import scrapedJobs from "@/lib/jobs-data.json";
 import { TypeTabs, FilterRow, SearchInput, EmptyState } from "./platform-ui";
-import { PublishDialog } from "./PublishDialog";
 
 const initialJobs = scrapedJobs as JobItem[];
 type JobCategory = NonNullable<JobItem["category"]>;
@@ -36,25 +36,14 @@ function regionMatch(category: JobCategory, region: string, location: string): b
   return location.includes(region) || location.includes(shortRegion);
 }
 
-const publishFields = [
-  { key: "title", label: "岗位名称", placeholder: "请输入岗位名称", required: true },
-  { key: "org", label: "机构名称", placeholder: "请输入机构名称", required: true },
-  { key: "kind", label: "用工类型", type: "select" as const, options: ["全职", "兼职", "实习"] },
-  { key: "role", label: "职能", type: "select" as const, options: filterGroups.jobRoles.slice(1) },
-  { key: "location", label: "工作地点", placeholder: "如：北京 / 远程办公" },
-  { key: "salary", label: "薪资", placeholder: "请输入面议或薪资范围" },
-  { key: "summary", label: "岗位描述", placeholder: "职责与要求…", type: "textarea" as const, required: true },
-];
-
 export function JobsBrowser() {
-  const [items, setItems] = useState<JobItem[]>(initialJobs);
+  const [items] = useState<JobItem[]>(initialJobs);
   const [category, setCategory] = useState<JobCategory>("人员招聘");
   const [kind, setKind] = useState("全部");
   const [role, setRole] = useState("全部");
   const [servicePeriod, setServicePeriod] = useState("全部");
   const [region, setRegion] = useState("全国");
   const [search, setSearch] = useState("");
-  const [dialogOpen, setDialogOpen] = useState(false);
 
   const filtered = useMemo(() => {
     const q = search.trim();
@@ -85,26 +74,6 @@ export function JobsBrowser() {
     resetFilters(nextCategory);
   };
 
-  const publish = (values: Record<string, string>) => {
-    const item: JobItem = {
-      id: String(Date.now()),
-      category: "人员招聘",
-      kind: (values.kind as JobItem["kind"]) || "全职",
-      role: values.role || "项目官员",
-      time: "刚刚发布",
-      publishedDays: 0,
-      title: `【${values.kind === "实习" ? "实习" : "招聘"}】${values.title} · ${values.org}`,
-      summary: values.summary,
-      org: values.org,
-      location: values.location || "全国",
-      salary: values.salary || "面议",
-      due: "长期招募",
-    };
-    setItems((list) => [item, ...list]);
-    setCategory("人员招聘");
-    resetFilters("人员招聘");
-  };
-
   return (
     <div className="module-body">
       <div className="module-main">
@@ -115,9 +84,9 @@ export function JobsBrowser() {
             <div className="banner-sub">全职 / 兼职 / 实习岗位 · 需机构入驻审核</div>
           </div>
           <span style={{ flex: 1 }} />
-          <button className="btn-primary" type="button" onClick={() => setDialogOpen(true)}>
+          <Link className="btn-primary" href="/publish/jobs">
             ＋ 发布招聘
-          </button>
+          </Link>
         </div>
 
         <TypeTabs tabs={jobTabs} active={category} onChange={changeCategory} />
@@ -228,13 +197,6 @@ export function JobsBrowser() {
         </div>
       </aside>
 
-      <PublishDialog
-        open={dialogOpen}
-        title="发布招聘岗位"
-        fields={publishFields}
-        onClose={() => setDialogOpen(false)}
-        onSubmit={publish}
-      />
     </div>
   );
 }

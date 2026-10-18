@@ -14,7 +14,6 @@ import {
   EmptyState,
   formatCount,
 } from "./platform-ui";
-import { PublishDialog } from "./PublishDialog";
 
 
 const sorts = [
@@ -40,16 +39,8 @@ function avatarTone(org: string): string {
   return avatarTones[h % avatarTones.length];
 }
 
-const publishFields = [
-  { key: "title", label: "标题", placeholder: "一句话说明这条动态", required: true },
-  { key: "content", label: "内容", placeholder: "分享项目进展、活动信息…", type: "textarea" as const, required: true },
-  { key: "field", label: "领域", type: "select" as const, options: filterGroups.fields.slice(1) },
-  { key: "hashtags", label: "话题", placeholder: "多个话题用逗号分隔，如：净滩行动,志愿者招募" },
-  { key: "location", label: "地点", placeholder: "如：北京" },
-];
-
 export function UpdatesBrowser() {
-  const [items, setItems] = useState<UpdateItem[]>(initialUpdates.slice(0, 1));
+  const [items] = useState<UpdateItem[]>(initialUpdates.slice(0, 1));
   const [field, setField] = useState("全部");
   const [region, setRegion] = useState("全部");
   const [search, setSearch] = useState("");
@@ -58,7 +49,6 @@ export function UpdatesBrowser() {
   const [liked, setLiked] = useState<Set<string>>(new Set());
   const [helped, setHelped] = useState<Set<string>>(new Set());
   const [shared, setShared] = useState<Set<string>>(new Set());
-  const [dialogOpen, setDialogOpen] = useState(false);
 
   const filtered = useMemo(() => {
     const q = search.trim();
@@ -97,36 +87,6 @@ export function UpdatesBrowser() {
     setRegion("全部");
     setSearch("");
     setPoster("全部");
-  };
-
-  const publish = (values: Record<string, string>) => {
-    const item: UpdateItem = {
-      id: `user-${Date.now()}`,
-      kind: "最新动态",
-      posterType: "个人",
-      field: values.field || "乡村教育",
-      region: "全国",
-      rating: 5.0,
-      publishedHours: 0,
-      time: "刚刚",
-      source: "来自 我的发布",
-      org: "我（演示账号）",
-      title: values.title,
-      content: values.content,
-      hashtags: (values.hashtags ?? "")
-        .split(/[,，]/)
-        .map((h) => h.trim().replace(/^#|#$/g, ""))
-        .filter(Boolean),
-      location: values.location || "全国",
-      period: "长期",
-      shares: 0,
-      comments: 0,
-      likes: 0,
-      helps: 0,
-    };
-    setItems((list) => [item, ...list]);
-    resetFilters();
-    setSort("new");
   };
 
   return (
@@ -262,9 +222,9 @@ export function UpdatesBrowser() {
       </div>
 
       <aside className="module-aside">
-        <button className="publish-btn" type="button" onClick={() => setDialogOpen(true)}>
+        <Link className="publish-btn" href="/publish/updates">
           ✏️ 我要发布
-        </button>
+        </Link>
 
         <div className="aside-card">
           <h2 className="aside-title">📊 平台动态数据</h2>
@@ -294,13 +254,6 @@ export function UpdatesBrowser() {
         </div>
       </aside>
 
-      <PublishDialog
-        open={dialogOpen}
-        title="发布项目动态"
-        fields={publishFields}
-        onClose={() => setDialogOpen(false)}
-        onSubmit={publish}
-      />
     </div>
   );
 }

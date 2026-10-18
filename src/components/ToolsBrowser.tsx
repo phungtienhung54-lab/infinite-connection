@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import Link from "next/link";
 import { toolTabs, filterGroups } from "@/lib/platform-data";
 import rawTools from "@/lib/tools-data.json";
 import {
@@ -156,6 +157,11 @@ export function ToolsBrowser() {
   return (
     <div className="module-body full">
       <div className="module-main">
+        <div className="section-banner publish-section-banner">
+          <div><div className="banner-title">公益能力资源</div><div className="banner-sub">分享课程、模板、报告与同行经验</div></div>
+          <span style={{ flex: 1 }} />
+          <Link className="btn-primary" href="/publish/tools">＋ 发布能力内容</Link>
+        </div>
         <TypeTabs
           tabs={toolTabs.map((t) => {
             const count =

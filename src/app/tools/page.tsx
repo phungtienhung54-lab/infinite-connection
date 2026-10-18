@@ -1,6 +1,7 @@
 import { SiteHeader } from "@/components/SiteHeader";
 import { PlatformFooter } from "@/components/PlatformFooter";
 import { ToolsBrowser } from "@/components/ToolsBrowser";
+import { PublishedContentSection } from "@/components/PublishedContentSection";
 import "../platform.css";
 
 export const metadata = {
@@ -12,6 +13,7 @@ export default function ToolsPage() {
     <div className="module-page">
       <SiteHeader active="tools" />
       <ToolsBrowser />
+      <PublishedContentSection module="TOOL" />
       <PlatformFooter />
     </div>
   );

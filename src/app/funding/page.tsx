@@ -1,6 +1,7 @@
 import { SiteHeader } from "@/components/SiteHeader";
 import { PlatformFooter } from "@/components/PlatformFooter";
 import { FundingBrowser } from "@/components/FundingBrowser";
+import { PublishedContentSection } from "@/components/PublishedContentSection";
 import "../platform.css";
 
 export const metadata = {
@@ -12,6 +13,7 @@ export default function FundingPage() {
     <div className="module-page">
       <SiteHeader active="funding" />
       <FundingBrowser />
+      <PublishedContentSection module="FUNDING" />
       <PlatformFooter />
     </div>
   );

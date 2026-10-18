@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import Link from "next/link";
 import {
   fundings,
   filterGroups,
@@ -187,6 +188,7 @@ export function FundingBrowser() {
       </div>
 
       <aside className="module-aside">
+        <Link className="publish-btn" href="/publish/funding">✏️ 发布资源</Link>
         <div className="urgent-card">
           <h2 className="aside-title">🚨 7天内截止</h2>
           {urgentFundings.length > 0 ? (

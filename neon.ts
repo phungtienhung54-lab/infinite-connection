@@ -4,6 +4,9 @@ import { defineConfig } from "@neon/config/v1";
 export default defineConfig({
   // Auth.js already provides auth; do not enable Neon Auth here.
   auth: false,
+  buckets: {
+    "user-content": { access: "private" },
+  },
   // Branch policy: per-branch tuning
   branch: (branch) => {
     if (branch.isDefault) {
