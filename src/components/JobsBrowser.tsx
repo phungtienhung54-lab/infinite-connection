@@ -1,22 +1,39 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import Link from "next/link";
 import { filterGroups, type JobItem } from "@/lib/platform-data";
-import scrapedJobs from "@/lib/jobs-data.json";
+import scrapedJobs from "@/lib/jobs-scraped.json";
 import { TypeTabs, FilterRow, SearchInput, EmptyState } from "./platform-ui";
-import { PublishDialog } from "./PublishDialog";
 
-const initialJobs = scrapedJobs as JobItem[];
+const initialJobs = (scrapedJobs as unknown as JobItem[]).map((job) => ({
+  ...job,
+  id: String(job.id),
+}));
 type JobCategory = NonNullable<JobItem["category"]>;
 
 const jobTabs = [{ label: "人员招聘" }, { label: "志愿者招募" }];
 
 const scrapedJobStats = [
-  { label: "本月新增岗位", value: "无法计算", unavailable: true },
-  { label: "当前收录机构", value: String(new Set(initialJobs.map((job) => job.org)).size) },
-  { label: "累计投递", value: "无法计算", unavailable: true },
-  { label: "当前远程岗位", value: String(initialJobs.filter((job) => job.location.includes("远程")).length) },
+  { label: "当前收录岗位", value: String(initialJobs.length) },
+  {
+    label: "30天内新增",
+    value: String(initialJobs.filter((job) => job.publishedDays <= 30).length),
+  },
+  { label: "收录机构", value: String(new Set(initialJobs.map((job) => job.org)).size) },
+  {
+    label: "线上/远程岗位",
+    value: String(
+      initialJobs.filter(
+        (job) => job.location.includes("远程") || job.location.includes("线上"),
+      ).length,
+    ),
+  },
 ];
+
+const latestJobs = [...initialJobs]
+  .sort((a, b) => a.publishedDays - b.publishedDays)
+  .slice(0, 3);
 
 const kindTagClass: Record<string, string> = {
   全职: "tag-green",
@@ -36,25 +53,14 @@ function regionMatch(category: JobCategory, region: string, location: string): b
   return location.includes(region) || location.includes(shortRegion);
 }
 
-const publishFields = [
-  { key: "title", label: "岗位名称", placeholder: "请输入岗位名称", required: true },
-  { key: "org", label: "机构名称", placeholder: "请输入机构名称", required: true },
-  { key: "kind", label: "用工类型", type: "select" as const, options: ["全职", "兼职", "实习"] },
-  { key: "role", label: "职能", type: "select" as const, options: filterGroups.jobRoles.slice(1) },
-  { key: "location", label: "工作地点", placeholder: "如：北京 / 远程办公" },
-  { key: "salary", label: "薪资", placeholder: "请输入面议或薪资范围" },
-  { key: "summary", label: "岗位描述", placeholder: "职责与要求…", type: "textarea" as const, required: true },
-];
-
 export function JobsBrowser() {
-  const [items, setItems] = useState<JobItem[]>(initialJobs);
+  const [items] = useState<JobItem[]>(initialJobs);
   const [category, setCategory] = useState<JobCategory>("人员招聘");
   const [kind, setKind] = useState("全部");
   const [role, setRole] = useState("全部");
   const [servicePeriod, setServicePeriod] = useState("全部");
   const [region, setRegion] = useState("全国");
   const [search, setSearch] = useState("");
-  const [dialogOpen, setDialogOpen] = useState(false);
 
   const filtered = useMemo(() => {
     const q = search.trim();
@@ -85,26 +91,6 @@ export function JobsBrowser() {
     resetFilters(nextCategory);
   };
 
-  const publish = (values: Record<string, string>) => {
-    const item: JobItem = {
-      id: String(Date.now()),
-      category: "人员招聘",
-      kind: (values.kind as JobItem["kind"]) || "全职",
-      role: values.role || "项目官员",
-      time: "刚刚发布",
-      publishedDays: 0,
-      title: `【${values.kind === "实习" ? "实习" : "招聘"}】${values.title} · ${values.org}`,
-      summary: values.summary,
-      org: values.org,
-      location: values.location || "全国",
-      salary: values.salary || "面议",
-      due: "长期招募",
-    };
-    setItems((list) => [item, ...list]);
-    setCategory("人员招聘");
-    resetFilters("人员招聘");
-  };
-
   return (
     <div className="module-body">
       <div className="module-main">
@@ -115,9 +101,9 @@ export function JobsBrowser() {
             <div className="banner-sub">全职 / 兼职 / 实习岗位 · 需机构入驻审核</div>
           </div>
           <span style={{ flex: 1 }} />
-          <button className="btn-primary" type="button" onClick={() => setDialogOpen(true)}>
+          <Link className="btn-primary" href="/publish/jobs">
             ＋ 发布招聘
-          </button>
+          </Link>
         </div>
 
         <TypeTabs tabs={jobTabs} active={category} onChange={changeCategory} />
@@ -185,6 +171,12 @@ export function JobsBrowser() {
                   <span className="item">🏛 {j.org}</span>
                   <span className="item">📍 {j.location}</span>
                   <span className="item">💼 {j.salary}</span>
+                  {j.sourceName && (
+                    <span className="item">
+                      📰 {j.sourceName}
+                      {j.time ? ` · ${j.time}` : ""}
+                    </span>
+                  )}
                 </div>
                 <div className="card-foot">
                   <span className="stat">📅 {j.due}</span>
@@ -206,11 +198,26 @@ export function JobsBrowser() {
 
       <aside className="module-aside">
         <div className="aside-card">
-          <h2 className="aside-title">🔥 急招岗位</h2>
-          <div className="aside-placeholder">
-            <strong>无法计算</strong>
-            <span>当前来源未提供急招标记</span>
-          </div>
+          <h2 className="aside-title">🆕 最新发布</h2>
+          <ul className="urgent-list">
+            {latestJobs.map((job) => (
+              <li key={job.id}>
+                {job.url ? (
+                  <a className="u-title" href={job.url} target="_blank" rel="noreferrer">
+                    {job.title}
+                  </a>
+                ) : (
+                  <span className="u-title">{job.title}</span>
+                )}
+                <span className="u-org">
+                  {job.org} · {job.location}
+                </span>
+                <span className="u-due">
+                  {job.publishedDays === 0 ? "今天发布" : `${job.publishedDays}天前发布`}
+                </span>
+              </li>
+            ))}
+          </ul>
         </div>
 
         <div className="aside-card">
@@ -219,22 +226,13 @@ export function JobsBrowser() {
             {scrapedJobStats.map((s, i) => (
               <div key={s.label} className="stat-row">
                 <span>{s.label}</span>
-                <span className={`value ${s.unavailable ? "is-placeholder" : `sv-${i % 4}`}`}>
-                  {s.value}
-                </span>
+                <span className={`value sv-${i % 4}`}>{s.value}</span>
               </div>
             ))}
           </div>
         </div>
       </aside>
 
-      <PublishDialog
-        open={dialogOpen}
-        title="发布招聘岗位"
-        fields={publishFields}
-        onClose={() => setDialogOpen(false)}
-        onSubmit={publish}
-      />
     </div>
   );
 }

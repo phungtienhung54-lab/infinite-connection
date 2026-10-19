@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { logout } from "@/lib/actions/auth";
 
 export function UserMenu({ name }: { name: string }) {
@@ -35,6 +36,12 @@ export function UserMenu({ name }: { name: string }) {
       </button>
       {open && (
         <div className="user-menu-dropdown" role="menu">
+          <Link href="/account" className="user-menu-item" role="menuitem">
+            账号中心
+          </Link>
+          <Link href="/account/content" className="user-menu-item" role="menuitem">
+            内容管理
+          </Link>
           <form action={logout}>
             <button type="submit" className="user-menu-item" role="menuitem">
               退出登录

@@ -4,7 +4,7 @@
 
 // import updatesData from './updates-data.json';
 import fundingsData from './fundings-data.json';
-import jobsData from './jobs-data.json';
+import jobsData from './jobs-scraped.json';
 import toolsData from './tools-data.json';
 
 /* ---------- 项目动态（参考微博信息流） ---------- */
@@ -266,18 +266,18 @@ export const updates: UpdateItem[] = [
 ];
 
 export const hotProjects = [
-  { rank: 1, title: "蚂蚁森林·阿拉善梭梭种植", meta: "互动 0 · 评分 0" },
-  { rank: 2, title: "美丽中国支教招募", meta: "互动 0 · 评分 0" },
-  { rank: 3, title: "心智障碍青年就业", meta: "互动 0 · 评分 0" },
-  { rank: 4, title: "留守儿童心理健康", meta: "互动 0 · 评分 0" },
-  { rank: 5, title: "全国沿海净滩行动", meta: "互动 0 · 评分 0" },
+  { rank: 1, title: "蚂蚁森林·阿拉善梭梭种植", meta: "互动 1.5k · 评分 4.8" },
+  { rank: 2, title: "美丽中国支教招募", meta: "互动 1.1k · 评分 4.9" },
+  { rank: 3, title: "心智障碍青年就业", meta: "互动 866 · 评分 4.7" },
+  { rank: 4, title: "留守儿童心理健康", meta: "互动 945 · 评分 4.8" },
+  { rank: 5, title: "全国沿海净滩行动", meta: "互动 1.3k · 评分 4.6" },
 ];
 
 export const platformStats = [
-  { label: "在线项目", value: "0", tone: "green" },
-  { label: "累计动态", value: "0", tone: "orange" },
-  { label: "活跃机构", value: "0", tone: "blue" },
-  { label: "参与用户", value: "0", tone: "purple" },
+  { label: "在线项目", value: "428", tone: "green" },
+  { label: "累计动态", value: "3,256", tone: "orange" },
+  { label: "活跃机构", value: "286", tone: "blue" },
+  { label: "参与用户", value: "12.8k", tone: "purple" },
 ];
 
 /* ---------- 资金 & 物资 ---------- */
@@ -287,7 +287,8 @@ export type FundingItem = {
   kind: "资助" | "需求" | "物资";
   type: string;
   supportType: "资金" | "物资";
-  duration: "6个月内" | "6-12个月" | "1-2年" | "2年以上";
+  /** "详见原帖" 表示原文未给出可确认周期 */
+  duration: "6个月内" | "6-12个月" | "1-2年" | "2年以上" | "详见原帖";
   field: string;
   region: string;
   title: string;
@@ -299,13 +300,20 @@ export type FundingItem = {
   dueDays: number;
   due: string;
   publishedDays: number;
+  /** 抓取时根据截止日期判断的状态（真实数据） */
+  status?: "开放中" | "已截止";
+  /** 抓取来源名称（真实数据） */
+  sourceName?: string;
+  /** 原帖发布日期（真实数据，YYYY-MM-DD） */
+  publishedDate?: string;
+  url?: string;
 };
 
 export const fundings: FundingItem[] = fundingsData as unknown as FundingItem[];
 
 // export const fundings: FundingItem[] = [
 //   {
-//     id: 1,
+//     id: "1",
 //     kind: "资助",
 //     type: "慈善会/基金会资助",
 //     supportType: "资金",
@@ -324,7 +332,7 @@ export const fundings: FundingItem[] = fundingsData as unknown as FundingItem[];
 //     publishedDays: 2,
 //   },
 //   {
-//     id: 2,
+//     id: "2",
 //     kind: "资助",
 //     type: "政府购买",
 //     supportType: "资金",
@@ -343,7 +351,7 @@ export const fundings: FundingItem[] = fundingsData as unknown as FundingItem[];
 //     publishedDays: 4,
 //   },
 //   {
-//     id: 3,
+//     id: "3",
 //     kind: "资助",
 //     type: "企业CSR",
 //     supportType: "资金",
@@ -362,7 +370,7 @@ export const fundings: FundingItem[] = fundingsData as unknown as FundingItem[];
 //     publishedDays: 1,
 //   },
 //   {
-//     id: 4,
+//     id: "4",
 //     kind: "资助",
 //     type: "慈善会/基金会资助",
 //     supportType: "资金",
@@ -381,7 +389,7 @@ export const fundings: FundingItem[] = fundingsData as unknown as FundingItem[];
 //     publishedDays: 6,
 //   },
 //   {
-//     id: 5,
+//     id: "5",
 //     kind: "资助",
 //     type: "政府购买",
 //     supportType: "资金",
@@ -400,7 +408,7 @@ export const fundings: FundingItem[] = fundingsData as unknown as FundingItem[];
 //     publishedDays: 3,
 //   },
 //   {
-//     id: 6,
+//     id: "6",
 //     kind: "资助",
 //     type: "合作共建",
 //     supportType: "资金",
@@ -419,7 +427,7 @@ export const fundings: FundingItem[] = fundingsData as unknown as FundingItem[];
 //     publishedDays: 8,
 //   },
 //   {
-//     id: 7,
+//     id: "7",
 //     kind: "需求",
 //     type: "资助需求",
 //     supportType: "资金",
@@ -438,7 +446,7 @@ export const fundings: FundingItem[] = fundingsData as unknown as FundingItem[];
 //     publishedDays: 2,
 //   },
 //   {
-//     id: 8,
+//     id: "8",
 //     kind: "需求",
 //     type: "资助需求",
 //     supportType: "资金",
@@ -457,7 +465,7 @@ export const fundings: FundingItem[] = fundingsData as unknown as FundingItem[];
 //     publishedDays: 5,
 //   },
 //   {
-//     id: 9,
+//     id: "9",
 //     kind: "物资",
 //     type: "物资需求",
 //     supportType: "物资",
@@ -476,7 +484,7 @@ export const fundings: FundingItem[] = fundingsData as unknown as FundingItem[];
 //     publishedDays: 3,
 //   },
 //   {
-//     id: 10,
+//     id: "10",
 //     kind: "物资",
 //     type: "物资供给",
 //     supportType: "物资",
@@ -495,6 +503,20 @@ export const fundings: FundingItem[] = fundingsData as unknown as FundingItem[];
 //     publishedDays: 1,
 //   },
 // ];
+
+export const urgentFundings = [
+  { title: "银杏成长计划", org: "南都基金会 · 乡村教育", due: "3天后截止" },
+  { title: "朝阳社工服务购买", org: "朝阳民政局 · 社会工作", due: "7天后截止" },
+  { title: "壹基金海洋公益", org: "壹基金 · 海洋保护", due: "9天后截止" },
+  { title: "万科社区营造", org: "万科基金会 · 社区", due: "15天后截止" },
+];
+
+export const fundingStats = [
+  { label: "本月新增", value: "428" },
+  { label: "本月截止", value: "156" },
+  { label: "累计资助额", value: "8.6亿+" },
+  { label: "活跃资助方", value: "286" },
+];
 
 /* ---------- 人力 & 专家 ---------- */
 
@@ -518,7 +540,10 @@ export type JobItem = {
   url?: string;
 };
 
-export const jobs: JobItem[] = jobsData as unknown as JobItem[];
+export const jobs: JobItem[] = (jobsData as unknown as JobItem[]).map((job) => ({
+  ...job,
+  id: String(job.id),
+}));
 /* ---------- 能力工具 ---------- */
 
 export type ToolItem = {
@@ -544,7 +569,7 @@ export const tools: ToolItem[] = toolsData as unknown as ToolItem[];
 
 // export const tools: ToolItem[] = [
 //   {
-//     id: 1,
+//     id: "1",
 //     category: "培训课程",
 //     field: "项目管理",
 //     forms: ["线下", "付费"],
@@ -563,7 +588,7 @@ export const tools: ToolItem[] = toolsData as unknown as ToolItem[];
 //     publishedDays: 3,
 //   },
 //   {
-//     id: 2,
+//     id: "2",
 //     category: "行业沙龙会议",
 //     field: "行业建设",
 //     forms: ["线下", "免费", "沙龙"],
@@ -580,7 +605,7 @@ export const tools: ToolItem[] = toolsData as unknown as ToolItem[];
 //     publishedDays: 5,
 //   },
 //   {
-//     id: 3,
+//     id: "3",
 //     category: "公益工具模板库",
 //     field: "项目管理",
 //     forms: ["免费"],
@@ -597,7 +622,7 @@ export const tools: ToolItem[] = toolsData as unknown as ToolItem[];
 //     publishedDays: 12,
 //   },
 //   {
-//     id: 4,
+//     id: "4",
 //     category: "行业报告",
 //     field: "团队管理",
 //     forms: ["免费"],
@@ -614,7 +639,7 @@ export const tools: ToolItem[] = toolsData as unknown as ToolItem[];
 //     publishedDays: 8,
 //   },
 //   {
-//     id: 5,
+//     id: "5",
 //     category: "同行经验文章",
 //     field: "财务",
 //     forms: ["线上", "免费"],
@@ -631,7 +656,7 @@ export const tools: ToolItem[] = toolsData as unknown as ToolItem[];
 //     publishedDays: 2,
 //   },
 //   {
-//     id: 6,
+//     id: "6",
 //     category: "行业标准",
 //     field: "财务",
 //     forms: ["免费"],
@@ -648,7 +673,7 @@ export const tools: ToolItem[] = toolsData as unknown as ToolItem[];
 //     publishedDays: 15,
 //   },
 //   {
-//     id: 7,
+//     id: "7",
 //     category: "公益工具模板库",
 //     field: "团队管理",
 //     forms: ["免费"],
@@ -665,7 +690,7 @@ export const tools: ToolItem[] = toolsData as unknown as ToolItem[];
 //     publishedDays: 20,
 //   },
 //   {
-//     id: 8,
+//     id: "8",
 //     category: "培训课程",
 //     field: "筹款",
 //     forms: ["线上", "付费"],
@@ -684,7 +709,7 @@ export const tools: ToolItem[] = toolsData as unknown as ToolItem[];
 //     publishedDays: 6,
 //   },
 //   {
-//     id: 9,
+//     id: "9",
 //     category: "行业沙龙会议",
 //     field: "行业建设",
 //     forms: ["线下", "免费", "沙龙"],
@@ -701,7 +726,7 @@ export const tools: ToolItem[] = toolsData as unknown as ToolItem[];
 //     publishedDays: 9,
 //   },
 //   {
-//     id: 10,
+//     id: "10",
 //     category: "国际经验",
 //     field: "综合素养",
 //     forms: ["线上", "免费"],
@@ -720,6 +745,12 @@ export const tools: ToolItem[] = toolsData as unknown as ToolItem[];
 // ];
 
 /* ---------- 筛选配置 ---------- */
+
+export const fundingTabs = [
+  { label: "最新资助", icon: "💰", count: "1,825" },
+  { label: "最新需求", icon: "📋", count: "486" },
+  { label: "物资供需", icon: "📦", count: "218" },
+];
 
 export const toolTabs = [
   { label: "全部", icon: "", count: "3,256" },
@@ -797,14 +828,15 @@ export const filterGroups = {
     "合作共建",
     "物资资助",
   ],
-  fundingDurations: ["全部", "6个月内", "6-12个月", "1-2年", "2年以上"],
+  fundingSupportTypes: ["全部", "资金", "物资"],
+  fundingDurations: ["全部", "6个月内", "6-12个月", "1-2年", "2年以上", "详见原帖"],
   fundingFields: ["全部", ...publicInterestFields],
   fundingRegions: ["全部", ...provinceOptions],
   fundingOther: ["全部", "最新发布（一周内）", "只看资助", "只看需求"],
   regions: ["全部", ...provinceOptions],
   jobKinds: ["全部", "全职", "兼职", "实习"],
   jobRoles: ["全部", "项目官员", "传播", "财务", "人力资源", "高级管理", "督导", "筹款", "法务", "研究"],
-  jobRegions: ["全国", ...provinceOptions],
+  jobRegions: ["全国", "线上", ...provinceOptions],
   volunteerPeriods: ["全部", "短期", "长期"],
   volunteerFields: ["全部", "项目执行", "活动执行", "传播", "人力资源", "督导", "筹款", "法务", "研究", "评估", "技术开发"],
   volunteerRegions: ["全部", "线上", ...provinceOptions],

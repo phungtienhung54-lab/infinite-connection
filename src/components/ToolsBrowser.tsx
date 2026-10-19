@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import Link from "next/link";
 import { toolTabs, filterGroups } from "@/lib/platform-data";
 import rawTools from "@/lib/tools-data.json";
 import {
@@ -45,6 +46,13 @@ const TONE_MAP: Record<string, string> = {
   "#e8eaf6": "indigo",
 };
 
+function actionLabel(raw: RawTool): string {
+  if (raw.category === "公益工具模板库") return "⬇ 获取模板";
+  if (raw.category === "行业报告") return "⬇ 查看报告";
+  if (raw.category === "培训课程") return "查看课程";
+  return "查看来源";
+}
+
 function adapt(raw: RawTool): ToolItem {
   const metaParts = [raw.dateText, raw.locationText].filter(Boolean);
   return {
@@ -60,7 +68,7 @@ function adapt(raw: RawTool): ToolItem {
     priceTag: raw.isFree ? "免费" : "商业付费",
     meta: metaParts.join(" · "),
     price: raw.isFree ? "" : raw.priceText,
-    action: raw.isFree ? "立即获取" : "立即报名",
+    action: actionLabel(raw),
     publishedDays: raw.publishedDays ?? 0,
     downloads: 0,
     rating: 5,
@@ -105,7 +113,6 @@ export function ToolsBrowser() {
   const [search, setSearch] = useState("");
   const [sort, setSort] = useState("new");
   const [favs, setFavs] = useState<Set<string>>(new Set());
-  const [downloaded, setDownloaded] = useState<Set<string>>(new Set());
 
   const filters = tabFilters[tab] ?? defaultFilters;
 
@@ -156,6 +163,11 @@ export function ToolsBrowser() {
   return (
     <div className="module-body full">
       <div className="module-main">
+        <div className="section-banner publish-section-banner">
+          <div><div className="banner-title">公益能力资源</div><div className="banner-sub">分享课程、模板、报告与同行经验</div></div>
+          <span style={{ flex: 1 }} />
+          <Link className="btn-primary" href="/publish/tools">＋ 发布能力内容</Link>
+        </div>
         <TypeTabs
           tabs={toolTabs.map((t) => {
             const count =
@@ -238,15 +250,14 @@ export function ToolsBrowser() {
                   {t.meta && <div className="tool-meta">{t.meta}</div>}
                   <p className="card-summary">{t.summary}</p>
                   <div className="tool-foot">
-                    <button
+                    <a
                       className={`tool-action${t.price ? "" : " outline"}`}
-                      type="button"
-                      onClick={() => toggle(downloaded, setDownloaded, t.id)}
+                      href={t.url}
+                      target="_blank"
+                      rel="noreferrer"
                     >
-                      {downloaded.has(t.id) && t.action.includes("下载")
-                        ? "✓ 已下载"
-                        : t.action}
-                    </button>
+                      {t.action}
+                    </a>
                     {t.price ? (
                       <span className="tool-extra">{t.price}</span>
                     ) : (

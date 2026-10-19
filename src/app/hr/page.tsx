@@ -1,6 +1,7 @@
 import { SiteHeader } from "@/components/SiteHeader";
 import { PlatformFooter } from "@/components/PlatformFooter";
 import { JobsBrowser } from "@/components/JobsBrowser";
+import { PublishedContentSection } from "@/components/PublishedContentSection";
 import "../platform.css";
 
 export const metadata = {
@@ -12,6 +13,7 @@ export default function HrPage() {
     <div className="module-page">
       <SiteHeader active="hr" />
       <JobsBrowser />
+      <PublishedContentSection module="JOB" />
       <PlatformFooter />
     </div>
   );

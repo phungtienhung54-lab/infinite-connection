@@ -14,7 +14,7 @@ export default async function RegisterPage() {
     <main className="auth-page">
       <div className="auth-card">
         <h1>注册</h1>
-        <p className="auth-subtitle">用邮箱创建账号，无需邮箱验证</p>
+        <p className="auth-subtitle">选择个人或机构身份，用邮箱创建账号</p>
         <RegisterForm />
       </div>
     </main>
