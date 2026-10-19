@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { SiteHeader } from "@/components/SiteHeader";
 import { PlatformFooter } from "@/components/PlatformFooter";
-import scrapedJobs from "@/lib/jobs-data.json";
+import scrapedJobs from "@/lib/jobs-scraped.json";
 import "./platform.css";
 
 const scrapedJobCount = scrapedJobs.length;

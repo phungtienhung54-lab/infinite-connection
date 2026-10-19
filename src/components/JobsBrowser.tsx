@@ -3,20 +3,37 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { filterGroups, type JobItem } from "@/lib/platform-data";
-import scrapedJobs from "@/lib/jobs-data.json";
+import scrapedJobs from "@/lib/jobs-scraped.json";
 import { TypeTabs, FilterRow, SearchInput, EmptyState } from "./platform-ui";
 
-const initialJobs = scrapedJobs as JobItem[];
+const initialJobs = (scrapedJobs as unknown as JobItem[]).map((job) => ({
+  ...job,
+  id: String(job.id),
+}));
 type JobCategory = NonNullable<JobItem["category"]>;
 
 const jobTabs = [{ label: "人员招聘" }, { label: "志愿者招募" }];
 
 const scrapedJobStats = [
-  { label: "本月新增岗位", value: "无法计算", unavailable: true },
-  { label: "当前收录机构", value: String(new Set(initialJobs.map((job) => job.org)).size) },
-  { label: "累计投递", value: "无法计算", unavailable: true },
-  { label: "当前远程岗位", value: String(initialJobs.filter((job) => job.location.includes("远程")).length) },
+  { label: "当前收录岗位", value: String(initialJobs.length) },
+  {
+    label: "30天内新增",
+    value: String(initialJobs.filter((job) => job.publishedDays <= 30).length),
+  },
+  { label: "收录机构", value: String(new Set(initialJobs.map((job) => job.org)).size) },
+  {
+    label: "线上/远程岗位",
+    value: String(
+      initialJobs.filter(
+        (job) => job.location.includes("远程") || job.location.includes("线上"),
+      ).length,
+    ),
+  },
 ];
+
+const latestJobs = [...initialJobs]
+  .sort((a, b) => a.publishedDays - b.publishedDays)
+  .slice(0, 3);
 
 const kindTagClass: Record<string, string> = {
   全职: "tag-green",
@@ -154,6 +171,12 @@ export function JobsBrowser() {
                   <span className="item">🏛 {j.org}</span>
                   <span className="item">📍 {j.location}</span>
                   <span className="item">💼 {j.salary}</span>
+                  {j.sourceName && (
+                    <span className="item">
+                      📰 {j.sourceName}
+                      {j.time ? ` · ${j.time}` : ""}
+                    </span>
+                  )}
                 </div>
                 <div className="card-foot">
                   <span className="stat">📅 {j.due}</span>
@@ -175,11 +198,26 @@ export function JobsBrowser() {
 
       <aside className="module-aside">
         <div className="aside-card">
-          <h2 className="aside-title">🔥 急招岗位</h2>
-          <div className="aside-placeholder">
-            <strong>无法计算</strong>
-            <span>当前来源未提供急招标记</span>
-          </div>
+          <h2 className="aside-title">🆕 最新发布</h2>
+          <ul className="urgent-list">
+            {latestJobs.map((job) => (
+              <li key={job.id}>
+                {job.url ? (
+                  <a className="u-title" href={job.url} target="_blank" rel="noreferrer">
+                    {job.title}
+                  </a>
+                ) : (
+                  <span className="u-title">{job.title}</span>
+                )}
+                <span className="u-org">
+                  {job.org} · {job.location}
+                </span>
+                <span className="u-due">
+                  {job.publishedDays === 0 ? "今天发布" : `${job.publishedDays}天前发布`}
+                </span>
+              </li>
+            ))}
+          </ul>
         </div>
 
         <div className="aside-card">
@@ -188,9 +226,7 @@ export function JobsBrowser() {
             {scrapedJobStats.map((s, i) => (
               <div key={s.label} className="stat-row">
                 <span>{s.label}</span>
-                <span className={`value ${s.unavailable ? "is-placeholder" : `sv-${i % 4}`}`}>
-                  {s.value}
-                </span>
+                <span className={`value sv-${i % 4}`}>{s.value}</span>
               </div>
             ))}
           </div>

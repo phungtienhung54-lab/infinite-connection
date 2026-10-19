@@ -15,15 +15,21 @@ import {
   EmptyState,
 } from "./platform-ui";
 
+// 已根据日期自动过滤截止项目：due 早于今天或 dueDays < 0 的记录不会进入前端列表。
+const shanghaiDate = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Shanghai" });
+const getShanghaiToday = () => shanghaiDate.format(new Date());
+const isExpiredFunding = (funding: FundingItem, today: string) =>
+  funding.dueDays < 0 ||
+  (/^\d{4}-\d{2}-\d{2}$/.test(funding.due) && funding.due < today);
+
 const sorts = [
   { key: "due", label: "截止最近" },
   { key: "amount", label: "金额最高" },
   { key: "new", label: "最新发布" },
 ];
 
-const fundingTabs = [{ label: "资金资助" }, { label: "物资资助" }];
-
-const tabToSupportType: Record<string, FundingItem["supportType"]> = {
+const tabToSupportType: Record<string, FundingItem["supportType"] | null> = {
+  全部: null,
   资金资助: "资金",
   物资资助: "物资",
 };
@@ -39,7 +45,7 @@ const kindTagClass: Record<string, string> = {
 };
 
 export function FundingBrowser() {
-  const [tab, setTab] = useState("资金资助");
+  const [tab, setTab] = useState("全部");
   const [resourceType, setResourceType] = useState("全部");
   const [duration, setDuration] = useState("全部");
   const [field, setField] = useState("全部");
@@ -47,13 +53,30 @@ export function FundingBrowser() {
   const [other, setOther] = useState("全部");
   const [search, setSearch] = useState("");
   const [sort, setSort] = useState("due");
+  const selectedSupportType = tabToSupportType[tab];
+
+  const today = getShanghaiToday();
+  const activeFundings = useMemo(
+    () => fundings.filter((funding) => !isExpiredFunding(funding, today)),
+    [today],
+  );
+  const fundingTabs = [
+    { label: "全部", count: String(activeFundings.length) },
+    {
+      label: "资金资助",
+      count: String(activeFundings.filter((funding) => funding.supportType === "资金").length),
+    },
+    {
+      label: "物资资助",
+      count: String(activeFundings.filter((funding) => funding.supportType === "物资").length),
+    },
+  ];
 
   const filtered = useMemo(() => {
     const q = search.trim();
-    const selectedSupportType = tabToSupportType[tab];
-    const list = fundings.filter(
+    const list = activeFundings.filter(
       (f) =>
-        f.supportType === selectedSupportType &&
+        (selectedSupportType === null || f.supportType === selectedSupportType) &&
         (other !== "只看资助" || f.kind === "资助") &&
         (other !== "只看需求" || f.kind === "需求" || f.kind === "物资") &&
         (resourceType === "全部" || f.type === resourceType) &&
@@ -70,7 +93,7 @@ export function FundingBrowser() {
       new: (a: FundingItem, b: FundingItem) => a.publishedDays - b.publishedDays,
     }[sort];
     return [...list].sort(by);
-  }, [tab, resourceType, duration, field, region, other, search, sort]);
+  }, [selectedSupportType, resourceType, duration, field, region, other, search, sort, activeFundings]);
 
   const resetFilters = () => {
     setResourceType("全部");
@@ -90,15 +113,16 @@ export function FundingBrowser() {
     setOther(next);
   };
 
-  const urgentFundings = fundings
+  const urgentFundings = activeFundings
     .filter((funding) => funding.dueDays > 0 && funding.dueDays <= 7)
     .sort((a, b) => a.dueDays - b.dueDays)
     .slice(0, 3);
   const fundingStats = [
-    { label: "当前收录", value: String(fundings.length) },
-    { label: "资金资助", value: String(fundings.filter((funding) => funding.supportType === "资金").length) },
-    { label: "物资资助", value: String(fundings.filter((funding) => funding.supportType === "物资").length) },
-    { label: "发布机构", value: String(new Set(fundings.map((funding) => funding.org)).size) },
+    { label: "当前收录", value: String(activeFundings.length) },
+    { label: "资金资助", value: String(activeFundings.filter((funding) => funding.supportType === "资金").length) },
+    { label: "物资资助", value: String(activeFundings.filter((funding) => funding.supportType === "物资").length) },
+    { label: "开放中", value: String(activeFundings.filter((funding) => funding.status === "开放中").length) },
+    { label: "发布机构", value: String(new Set(activeFundings.map((funding) => funding.org)).size) },
   ];
 
   return (
@@ -107,7 +131,7 @@ export function FundingBrowser() {
         <TypeTabs tabs={fundingTabs} active={tab} onChange={changeTab} />
 
         <div className="filter-panel">
-          {tab === "资金资助" && (
+          {tab !== "物资资助" && (
             <>
               <div className="pc-card filter-box">
                 <FilterRow
@@ -146,8 +170,12 @@ export function FundingBrowser() {
         </div>
 
         <ListMeta
-          total={fundings.filter((funding) => funding.supportType === tabToSupportType[tab]).length}
-          unit={`条${tab}`}
+          total={
+            selectedSupportType === null
+              ? activeFundings.length
+              : activeFundings.filter((funding) => funding.supportType === selectedSupportType).length
+          }
+          unit={tab === "全部" ? "条资源" : `条${tab}`}
           shown={filtered.length}
           sorts={sorts}
           activeSort={sort}
@@ -164,9 +192,24 @@ export function FundingBrowser() {
                   <span className={`tag ${kindTagClass[f.kind] ?? "tag-green"}`}>{f.type}</span>
                   <span className="tag tag-pink">{f.field}</span>
                   <span className="spacer" />
-                  <span className={`tag ${f.dueDays > 0 && f.dueDays <= 7 ? "tag-red" : "tag-yellow"}`}>
-                  {f.dueDays > 0 ? `${f.dueDays}天截止` : "长期有效"}
-                  </span>
+                  {f.status === "已截止" ? (
+                    <span className="tag tag-red">已截止</span>
+                  ) : (
+                    <>
+                      {f.status === "开放中" && <span className="tag tag-green">开放中</span>}
+                      {f.dueDays > 0 ? (
+                        <span className={`tag ${f.dueDays <= 7 ? "tag-red" : "tag-yellow"}`}>
+                          {f.dueDays}天截止
+                        </span>
+                      ) : (
+                        f.status !== "开放中" && (
+                          <span className="tag tag-yellow">
+                            {f.due === "长期有效" ? "长期有效" : "详见原帖"}
+                          </span>
+                        )
+                      )}
+                    </>
+                  )}
                 </div>
                 <h3 className="card-title">{f.title}</h3>
                 <p className="card-summary">{f.summary}</p>
@@ -174,6 +217,12 @@ export function FundingBrowser() {
                   <span className="item">🏛 {f.org}</span>
                   <span className="item">📍 {f.location}</span>
                   <span className="item">💰 {f.amount}</span>
+                  {f.sourceName && (
+                    <span className="item">
+                      📰 {f.sourceName}
+                      {f.publishedDate ? ` · ${f.publishedDate}` : ""}
+                    </span>
+                  )}
                 </div>
                 <div className="card-foot">
                   <span className="stat">📅 截止 {f.due}</span>
