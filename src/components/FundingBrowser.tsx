@@ -15,22 +15,17 @@ import {
   EmptyState,
 } from "./platform-ui";
 
+// 已根据日期自动过滤截止项目：due 早于今天或 dueDays < 0 的记录不会进入前端列表。
+const shanghaiDate = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Shanghai" });
+const getShanghaiToday = () => shanghaiDate.format(new Date());
+const isExpiredFunding = (funding: FundingItem, today: string) =>
+  funding.dueDays < 0 ||
+  (/^\d{4}-\d{2}-\d{2}$/.test(funding.due) && funding.due < today);
+
 const sorts = [
   { key: "due", label: "截止最近" },
   { key: "amount", label: "金额最高" },
   { key: "new", label: "最新发布" },
-];
-
-const fundingTabs = [
-  { label: "全部", count: String(fundings.length) },
-  {
-    label: "资金资助",
-    count: String(fundings.filter((funding) => funding.supportType === "资金").length),
-  },
-  {
-    label: "物资资助",
-    count: String(fundings.filter((funding) => funding.supportType === "物资").length),
-  },
 ];
 
 const tabToSupportType: Record<string, FundingItem["supportType"] | null> = {
@@ -60,9 +55,26 @@ export function FundingBrowser() {
   const [sort, setSort] = useState("due");
   const selectedSupportType = tabToSupportType[tab];
 
+  const today = getShanghaiToday();
+  const activeFundings = useMemo(
+    () => fundings.filter((funding) => !isExpiredFunding(funding, today)),
+    [today],
+  );
+  const fundingTabs = [
+    { label: "全部", count: String(activeFundings.length) },
+    {
+      label: "资金资助",
+      count: String(activeFundings.filter((funding) => funding.supportType === "资金").length),
+    },
+    {
+      label: "物资资助",
+      count: String(activeFundings.filter((funding) => funding.supportType === "物资").length),
+    },
+  ];
+
   const filtered = useMemo(() => {
     const q = search.trim();
-    const list = fundings.filter(
+    const list = activeFundings.filter(
       (f) =>
         (selectedSupportType === null || f.supportType === selectedSupportType) &&
         (other !== "只看资助" || f.kind === "资助") &&
@@ -81,7 +93,7 @@ export function FundingBrowser() {
       new: (a: FundingItem, b: FundingItem) => a.publishedDays - b.publishedDays,
     }[sort];
     return [...list].sort(by);
-  }, [tab, selectedSupportType, resourceType, duration, field, region, other, search, sort]);
+  }, [selectedSupportType, resourceType, duration, field, region, other, search, sort, activeFundings]);
 
   const resetFilters = () => {
     setResourceType("全部");
@@ -101,16 +113,16 @@ export function FundingBrowser() {
     setOther(next);
   };
 
-  const urgentFundings = fundings
+  const urgentFundings = activeFundings
     .filter((funding) => funding.dueDays > 0 && funding.dueDays <= 7)
     .sort((a, b) => a.dueDays - b.dueDays)
     .slice(0, 3);
   const fundingStats = [
-    { label: "当前收录", value: String(fundings.length) },
-    { label: "资金资助", value: String(fundings.filter((funding) => funding.supportType === "资金").length) },
-    { label: "物资资助", value: String(fundings.filter((funding) => funding.supportType === "物资").length) },
-    { label: "开放中", value: String(fundings.filter((funding) => funding.status === "开放中").length) },
-    { label: "发布机构", value: String(new Set(fundings.map((funding) => funding.org)).size) },
+    { label: "当前收录", value: String(activeFundings.length) },
+    { label: "资金资助", value: String(activeFundings.filter((funding) => funding.supportType === "资金").length) },
+    { label: "物资资助", value: String(activeFundings.filter((funding) => funding.supportType === "物资").length) },
+    { label: "开放中", value: String(activeFundings.filter((funding) => funding.status === "开放中").length) },
+    { label: "发布机构", value: String(new Set(activeFundings.map((funding) => funding.org)).size) },
   ];
 
   return (
@@ -160,8 +172,8 @@ export function FundingBrowser() {
         <ListMeta
           total={
             selectedSupportType === null
-              ? fundings.length
-              : fundings.filter((funding) => funding.supportType === selectedSupportType).length
+              ? activeFundings.length
+              : activeFundings.filter((funding) => funding.supportType === selectedSupportType).length
           }
           unit={tab === "全部" ? "条资源" : `条${tab}`}
           shown={filtered.length}
