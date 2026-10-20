@@ -14,7 +14,7 @@ import {
 
 /* ---------- 原始数据 → ToolItem 适配 ---------- */
 
-type RawTool = (typeof rawTools)[number];
+type RawTool = (typeof rawTools)[number] & { provider?: string };
 
 type ToolItem = {
   id: string;
@@ -24,6 +24,7 @@ type ToolItem = {
   duration: string;
   title: string;
   summary: string;
+  publisher: string;
   tone: string;
   icon: string;
   priceTag: string;
@@ -46,29 +47,33 @@ const TONE_MAP: Record<string, string> = {
   "#e8eaf6": "indigo",
 };
 
-function actionLabel(raw: RawTool): string {
-  if (raw.category === "公益工具模板库") return "⬇ 获取模板";
-  if (raw.category === "行业报告") return "⬇ 查看报告";
-  if (raw.category === "培训课程") return "查看课程";
+const OTHER_CATEGORY_PATTERN = /纪念册|会刊|活动册|相册/;
+
+function actionLabel(category: string): string {
+  if (category === "公益工具模板库") return "⬇ 获取模板";
+  if (category === "行业报告") return "⬇ 查看报告";
+  if (category === "培训课程") return "查看课程";
   return "查看来源";
 }
 
 function adapt(raw: RawTool): ToolItem {
   const metaParts = [raw.dateText, raw.locationText].filter(Boolean);
+  const category = OTHER_CATEGORY_PATTERN.test(raw.title) ? "其他" : raw.category;
   return {
     id: String(raw.id),
-    category: raw.category,
+    category,
     field: raw.domain || "",
     forms: raw.format ? [raw.format] : [],
     duration: raw.period || "",
     title: raw.title,
     summary: raw.summary,
+    publisher: raw.provider?.trim() || raw.org?.trim() || "平台官方",
     tone: TONE_MAP[raw.color || ""] || "green",
     icon: raw.icon || "📦",
     priceTag: raw.isFree ? "免费" : "商业付费",
     meta: metaParts.join(" · "),
     price: raw.isFree ? "" : raw.priceText,
-    action: actionLabel(raw),
+    action: actionLabel(category),
     publishedDays: raw.publishedDays ?? 0,
     downloads: 0,
     rating: 5,
@@ -77,6 +82,21 @@ function adapt(raw: RawTool): ToolItem {
 }
 
 const tools: ToolItem[] = (rawTools as RawTool[]).map(adapt);
+
+const knownToolCategories = new Set(
+  toolTabs
+    .filter((item) => item.label !== "全部" && item.label !== "其他")
+    .map((item) => item.label),
+);
+
+const toolTabsWithOther = toolTabs.some((item) => item.label === "其他")
+  ? toolTabs
+  : [...toolTabs, { label: "其他", icon: "📦", count: "" }];
+
+function matchesToolTab(tool: ToolItem, tab: string): boolean {
+  if (tab === "全部" || tool.category === tab) return true;
+  return tab === "其他" && !knownToolCategories.has(tool.category);
+}
 
 /* ---------- 排序选项 ---------- */
 
@@ -120,7 +140,7 @@ export function ToolsBrowser() {
     const q = search.trim();
     const list = tools.filter(
       (t) =>
-        (tab === "全部" || t.category === tab) &&
+        (tab === "全部" || matchesToolTab(t, tab)) &&
         (field === "全部" || t.field === field) &&
         (form === "全部" || t.forms.includes(form)) &&
         (duration === "全部" || t.duration === duration) &&
@@ -166,14 +186,14 @@ export function ToolsBrowser() {
         <div className="section-banner publish-section-banner">
           <div><div className="banner-title">公益能力资源</div><div className="banner-sub">分享课程、模板、报告与同行经验</div></div>
           <span style={{ flex: 1 }} />
-          <Link className="btn-primary" href="/publish/tools">＋ 发布能力内容</Link>
+          <Link className="btn-primary" href="/publish/tools">＋ 我要发布</Link>
         </div>
         <TypeTabs
-          tabs={toolTabs.map((t) => {
+          tabs={toolTabsWithOther.map((t) => {
             const count =
               t.label === "全部"
                 ? tools.length
-                : tools.filter((x) => x.category === t.label).length;
+                : tools.filter((x) => matchesToolTab(x, t.label)).length;
             return { ...t, count: String(count) };
           })}
           active={tab}
@@ -248,7 +268,12 @@ export function ToolsBrowser() {
                   </div>
                   <h3 className="card-title">{t.title}</h3>
                   {t.meta && <div className="tool-meta">{t.meta}</div>}
-                  <p className="card-summary">{t.summary}</p>
+                  {!t.summary.trimStart().startsWith("【原创成果】") && (
+                    <p className="card-summary">{t.summary}</p>
+                  )}
+                  <div className="card-meta">
+                    <span className="item">发布者：{t.publisher}</span>
+                  </div>
                   <div className="tool-foot">
                     <a
                       className={`tool-action${t.price ? "" : " outline"}`}

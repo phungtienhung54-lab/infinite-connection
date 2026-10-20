@@ -11,6 +11,7 @@ const PROVINCES = ["北京市","天津市","上海市","重庆市","河北省","
 const NGO_KEYWORDS = /基金会|公益|慈善|协会|社会服务|社会工作|NGO|红十字会|志愿服务|社工|恩派|壹基金/i;
 
 const ROLE_RULES = [
+  { regex: /社工|社会工作者|一线社工|医务社工/i, role: "社工" },
   { regex: /项目|program|project/i, role: "项目官员" },
   { regex: /传播|媒体|品牌|communication/i, role: "传播" },
   { regex: /财务|会计|finance/i, role: "财务" },

@@ -85,7 +85,7 @@ export async function saveContent(
   const attachmentIds = [...new Set(formData.getAll("attachmentIds").map(String).filter(Boolean))];
   const nextStatus = values.intent === "submit" ? "PENDING_REVIEW" : "DRAFT";
 
-  if (attachmentIds.length > 9) return { error: "每篇内容最多上传9张图片" };
+  if (attachmentIds.length > 6) return { error: "每篇内容最多上传6张图片" };
 
   if (values.intent === "submit") {
     const fieldErrors: Record<string, string[]> = {};

@@ -11,6 +11,8 @@ const PROVINCES = ["北京市","天津市","上海市","重庆市","河北省","
 const BLACKLIST_REGEX = /支付宝|腾讯公益|水滴筹|轻松筹|基金会中心网|筹款项目|采购公告|中标|成交公告|招标公告|企业采购|商家招募|政府采购/i;
 // ✅ 白名单：必须面向公益机构
 const WHITELIST_REGEX = /社会组织|公益组织|社工机构|社会服务机构|公益伙伴|招募|资助计划|项目申报|机构资助/i;
+const ECO_TITLE_REGEX = /生态|环保|绿化|低碳/;
+const COMMUNITY_TITLE_REGEX = /社区|营造|邻里|居民/;
 
 async function main() {
   console.log("🚀 开始清洗资助模块数据...\n");
@@ -31,6 +33,16 @@ async function main() {
     
     const foundProv = PROVINCES.find(prov => text.includes(prov));
     if (foundProv) item.region = foundProv;
+
+    // 生态环保标签只由标题中的明确关键词决定，避免正文里的泛化环境描述误伤分类。
+    if (item.field === "生态环保" && !ECO_TITLE_REGEX.test(item.title)) {
+      item.field = "其他";
+    }
+
+    // 社区营造标签同样只认标题中的明确关键词，避免正文提到社区服务就误判。
+    if (item.field === "社区营造" && !COMMUNITY_TITLE_REGEX.test(item.title)) {
+      item.field = "其他";
+    }
 
     if (/物资|设备|图书|捐赠物品|课程|培训名额/i.test(text)) {
       item.supportType = "物资/课程";

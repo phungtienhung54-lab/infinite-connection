@@ -16,7 +16,7 @@ export const publishModules: Record<PublishModuleSlug, PublishModuleConfig> = {
   updates: {
     module: "UPDATE",
     label: "项目动态",
-    description: "分享项目进展或发布公益活动，让更多同行看见。",
+    description: "让爱与善意传递给更多人。",
     organizationOnly: false,
     subtypes: ["公益项目", "公益活动"],
     bodyLabel: "动态内容",

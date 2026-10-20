@@ -1662,17 +1662,24 @@
   display: none;
 }
 
-.upload-box small,
-.uploaded-files {
+.upload-box small {
   color: var(--pc-text-3);
   font-size: 12px;
 }
 
-.uploaded-files {
-  display: flex;
-  flex-wrap: wrap;
+.uploaded-images {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
-  list-style: none;
+}
+
+.uploaded-images img {
+  width: 100%;
+  aspect-ratio: 1;
+  object-fit: cover;
+  border: 1px solid var(--pc-border);
+  border-radius: 8px;
+  background: var(--pc-bg);
 }
 
 .publish-confirm {
@@ -2035,12 +2042,6 @@
 
 .published-feed-actions {
   margin-top: 2px;
-}
-
-.contact-fieldset {
-  background: var(--pc-primary-tint);
-  border-radius: 12px;
-  padding: 16px;
 }
 
 .contact-autofill-note {
