@@ -6,10 +6,23 @@ import { filterGroups, type JobItem } from "@/lib/platform-data";
 import scrapedJobs from "@/lib/jobs-scraped.json";
 import { TypeTabs, FilterRow, SearchInput, EmptyState } from "./platform-ui";
 
-const initialJobs = (scrapedJobs as unknown as JobItem[]).map((job) => ({
-  ...job,
-  id: String(job.id),
-}));
+function dedupeByTitle<T extends { title: string }>(items: T[]): T[] {
+  const seen = new Set<string>();
+  return items.filter((item) => {
+    const title = item.title.trim();
+    if (!title) return true;
+    if (seen.has(title)) return false;
+    seen.add(title);
+    return true;
+  });
+}
+
+const initialJobs = dedupeByTitle(
+  (scrapedJobs as unknown as JobItem[]).map((job) => ({
+    ...job,
+    id: String(job.id),
+  })),
+);
 type JobCategory = NonNullable<JobItem["category"]>;
 
 const jobTabs = [{ label: "人员招聘" }, { label: "志愿者招募" }];
@@ -98,7 +111,7 @@ export function JobsBrowser() {
           <span className="banner-icon">💼</span>
           <div>
             <div className="banner-title">公益行业招聘</div>
-            <div className="banner-sub">全职 / 兼职 / 实习岗位 · 需机构入驻审核</div>
+            <div className="banner-sub">全职 / 兼职 / 实习岗位</div>
           </div>
           <span style={{ flex: 1 }} />
           <Link className="btn-primary" href="/publish/jobs">
@@ -171,12 +184,6 @@ export function JobsBrowser() {
                   <span className="item">🏛 {j.org}</span>
                   <span className="item">📍 {j.location}</span>
                   <span className="item">💼 {j.salary}</span>
-                  {j.sourceName && (
-                    <span className="item">
-                      📰 {j.sourceName}
-                      {j.time ? ` · ${j.time}` : ""}
-                    </span>
-                  )}
                 </div>
                 <div className="card-foot">
                   <span className="stat">📅 {j.due}</span>

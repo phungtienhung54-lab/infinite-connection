@@ -15,12 +15,38 @@ import {
   EmptyState,
 } from "./platform-ui";
 
-// 已根据日期自动过滤截止项目：due 早于今天或 dueDays < 0 的记录不会进入前端列表。
+// 截止天数按 Asia/Shanghai 的今天与 due 日期重新计算，不依赖抓取时生成的 dueDays。
 const shanghaiDate = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Shanghai" });
 const getShanghaiToday = () => shanghaiDate.format(new Date());
-const isExpiredFunding = (funding: FundingItem, today: string) =>
-  funding.dueDays < 0 ||
-  (/^\d{4}-\d{2}-\d{2}$/.test(funding.due) && funding.due < today);
+const DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/;
+const MS_PER_DAY = 24 * 60 * 60 * 1000;
+
+function getRemainingDays(due: string, today: string): number | null {
+  if (!DATE_ONLY.test(due)) return null;
+  const dueTime = Date.parse(`${due}T00:00:00Z`);
+  const todayTime = Date.parse(`${today}T00:00:00Z`);
+  if (!Number.isFinite(dueTime) || !Number.isFinite(todayTime)) return null;
+  return Math.round((dueTime - todayTime) / MS_PER_DAY);
+}
+
+type FundingWithRemainingDays = FundingItem & { remainingDays: number | null };
+
+const isExpiredFunding = (funding: FundingWithRemainingDays) =>
+  funding.remainingDays !== null
+    ? funding.remainingDays < 0
+    : funding.status === "已截止";
+
+function dedupeByTitleAndOrg<T extends { title: string; org: string }>(items: T[]): T[] {
+  const seen = new Set<string>();
+  return items.filter((item) => {
+    const key = `${item.title.trim()}::${item.org.trim()}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+const uniqueFundings = dedupeByTitleAndOrg(fundings);
 
 const sorts = [
   { key: "due", label: "截止最近" },
@@ -56,8 +82,14 @@ export function FundingBrowser() {
   const selectedSupportType = tabToSupportType[tab];
 
   const today = getShanghaiToday();
-  const activeFundings = useMemo(
-    () => fundings.filter((funding) => !isExpiredFunding(funding, today)),
+  const activeFundings = useMemo<FundingWithRemainingDays[]>(
+    () =>
+      uniqueFundings
+        .map((funding) => ({
+          ...funding,
+          remainingDays: getRemainingDays(funding.due, today),
+        }))
+        .filter((funding) => !isExpiredFunding(funding)),
     [today],
   );
   const fundingTabs = [
@@ -87,13 +119,17 @@ export function FundingBrowser() {
         (!q || f.title.includes(q) || f.org.includes(q) || f.summary.includes(q)),
     );
     const by = {
-      due: (a: FundingItem, b: FundingItem) =>
-        (a.dueDays || Number.POSITIVE_INFINITY) - (b.dueDays || Number.POSITIVE_INFINITY),
+      due: (a: FundingWithRemainingDays, b: FundingWithRemainingDays) =>
+        (a.remainingDays ?? Number.POSITIVE_INFINITY) -
+        (b.remainingDays ?? Number.POSITIVE_INFINITY),
       amount: (a: FundingItem, b: FundingItem) => b.amountWan - a.amountWan,
       new: (a: FundingItem, b: FundingItem) => a.publishedDays - b.publishedDays,
     }[sort];
     return [...list].sort(by);
   }, [selectedSupportType, resourceType, duration, field, region, other, search, sort, activeFundings]);
+
+  // 渲染前再次按“标题 + 机构”严格去重，确保同一机构发布的同一标题只出现一次。
+  const renderedFundings = dedupeByTitleAndOrg(filtered);
 
   const resetFilters = () => {
     setResourceType("全部");
@@ -114,8 +150,17 @@ export function FundingBrowser() {
   };
 
   const urgentFundings = activeFundings
-    .filter((funding) => funding.dueDays > 0 && funding.dueDays <= 7)
-    .sort((a, b) => a.dueDays - b.dueDays)
+    .filter(
+      (funding) =>
+        funding.remainingDays !== null &&
+        funding.remainingDays > 0 &&
+        funding.remainingDays <= 7,
+    )
+    .sort(
+      (a, b) =>
+        (a.remainingDays ?? Number.POSITIVE_INFINITY) -
+        (b.remainingDays ?? Number.POSITIVE_INFINITY),
+    )
     .slice(0, 3);
   const fundingStats = [
     { label: "当前收录", value: String(activeFundings.length) },
@@ -144,7 +189,9 @@ export function FundingBrowser() {
               <div className="pc-card filter-box">
                 <FilterRow
                   label="资助周期"
-                  options={filterGroups.fundingDurations}
+                  options={filterGroups.fundingDurations.filter(
+                    (option) => option !== "详见原帖",
+                  )}
                   active={duration}
                   onChange={setDuration}
                 />
@@ -176,17 +223,17 @@ export function FundingBrowser() {
               : activeFundings.filter((funding) => funding.supportType === selectedSupportType).length
           }
           unit={tab === "全部" ? "条资源" : `条${tab}`}
-          shown={filtered.length}
+          shown={renderedFundings.length}
           sorts={sorts}
           activeSort={sort}
           onSort={setSort}
         />
 
-        {filtered.length === 0 ? (
+        {renderedFundings.length === 0 ? (
           <EmptyState onReset={resetFilters} />
         ) : (
           <div className="card-grid-2">
-            {filtered.map((f) => (
+            {renderedFundings.map((f) => (
               <article key={f.id} className="pc-card content-card">
                 <div className="card-head">
                   <span className={`tag ${kindTagClass[f.kind] ?? "tag-green"}`}>{f.type}</span>
@@ -197,9 +244,13 @@ export function FundingBrowser() {
                   ) : (
                     <>
                       {f.status === "开放中" && <span className="tag tag-green">开放中</span>}
-                      {f.dueDays > 0 ? (
-                        <span className={`tag ${f.dueDays <= 7 ? "tag-red" : "tag-yellow"}`}>
-                          {f.dueDays}天截止
+                      {f.remainingDays !== null && f.remainingDays > 0 ? (
+                        <span
+                          className={`tag ${
+                            f.remainingDays <= 7 ? "tag-red" : "tag-yellow"
+                          }`}
+                        >
+                          {f.remainingDays}天截止
                         </span>
                       ) : (
                         f.status !== "开放中" && (
@@ -217,12 +268,6 @@ export function FundingBrowser() {
                   <span className="item">🏛 {f.org}</span>
                   <span className="item">📍 {f.location}</span>
                   <span className="item">💰 {f.amount}</span>
-                  {f.sourceName && (
-                    <span className="item">
-                      📰 {f.sourceName}
-                      {f.publishedDate ? ` · ${f.publishedDate}` : ""}
-                    </span>
-                  )}
                 </div>
                 <div className="card-foot">
                   <span className="stat">📅 截止 {f.due}</span>
@@ -248,7 +293,7 @@ export function FundingBrowser() {
                     {u.title}
                   </a>
                   <span className="u-org">{u.org} · {u.field}</span>
-                  <span className="u-due">⏰ {u.dueDays}天后截止</span>
+                  <span className="u-due">⏰ {u.remainingDays}天后截止</span>
                 </li>
               ))}
             </ul>

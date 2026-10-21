@@ -4,8 +4,6 @@ import { useMemo, useState } from "react";
 import {
   updates as initialUpdates,
   filterGroups,
-  platformStats,
-  hotProjects,
   type UpdateItem,
 } from "@/lib/platform-data";
 import {
@@ -40,6 +38,22 @@ function avatarTone(org: string): string {
 }
 
 export function UpdatesBrowser() {
+  // 右侧栏展示数据必须在组件内部写死，不引用 platform-data 中的示例热门项目。
+  const platformStats = [
+    { label: "在线项目", value: "0", tone: "green" },
+    { label: "累计动态", value: "0", tone: "orange" },
+    { label: "活跃机构", value: "0", tone: "blue" },
+    { label: "参与用户", value: "0", tone: "purple" },
+  ];
+
+  const hotProjects = [
+    { rank: 1, title: "测试-XXX基金会", meta: "互动 0 · 评分 0.0" },
+    { rank: 2, title: "项目1", meta: "互动 0 · 评分 0.0" },
+    { rank: 3, title: "项目2", meta: "互动 0 · 评分 0.0" },
+    { rank: 4, title: "项目3", meta: "互动 0 · 评分 0.0" },
+    { rank: 5, title: "项目4", meta: "互动 0 · 评分 0.0" },
+  ];
+
   const [items] = useState<UpdateItem[]>(initialUpdates.slice(0, 1));
   const [field, setField] = useState("全部");
   const [region, setRegion] = useState("全部");

@@ -1,6 +1,7 @@
 "use client";
 
-import { startTransition, useActionState, useRef, useState } from "react";
+import { startTransition, useActionState, useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { saveContent, type ContentFormState } from "@/lib/actions/content";
 import {
@@ -24,6 +25,35 @@ type InitialContent = {
 };
 
 const initialState: ContentFormState = {};
+const MAX_IMAGES = 6;
+
+const PROVINCE_CITIES: Record<string, string[]> = {
+  北京市: ["北京市"],
+  天津市: ["天津市"],
+  上海市: ["上海市"],
+  重庆市: ["重庆市"],
+  河北省: ["石家庄市", "唐山市", "保定市"],
+  辽宁省: ["沈阳市", "大连市"],
+  江苏省: ["南京市", "苏州市", "无锡市", "常州市"],
+  浙江省: ["杭州市", "宁波市", "温州市", "嘉兴市"],
+  安徽省: ["合肥市", "芜湖市"],
+  福建省: ["福州市", "厦门市", "泉州市"],
+  山东省: ["济南市", "青岛市", "烟台市"],
+  河南省: ["郑州市", "洛阳市"],
+  湖北省: ["武汉市", "宜昌市"],
+  湖南省: ["长沙市", "株洲市"],
+  广东省: ["广州市", "深圳市", "珠海市", "佛山市", "东莞市"],
+  海南省: ["海口市", "三亚市"],
+  四川省: ["成都市", "绵阳市"],
+  云南省: ["昆明市", "大理市"],
+  陕西省: ["西安市", "咸阳市"],
+  广西壮族自治区: ["南宁市", "桂林市"],
+  内蒙古自治区: ["呼和浩特市", "包头市"],
+  新疆维吾尔自治区: ["乌鲁木齐市"],
+  香港特别行政区: ["香港特别行政区"],
+  澳门特别行政区: ["澳门特别行政区"],
+  台湾省: ["台北市", "高雄市"],
+};
 
 function TextField({
   name,
@@ -70,11 +100,44 @@ export function PublishForm({
     return result;
   }, initialState);
   const formRef = useRef<HTMLFormElement>(null);
+  const router = useRouter();
+  const submittedIntent = useRef<"submit" | "draft">("submit");
+  const actionWasPending = useRef(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isSavingDraft, setIsSavingDraft] = useState(false);
   const [preview, setPreview] = useState<Record<string, string> | null>(null);
   const [attachments, setAttachments] = useState(initial?.attachments ?? []);
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState("");
+  const [selectedRegion, setSelectedRegion] = useState(initial?.region ?? "");
+  const [selectedCity, setSelectedCity] = useState(initial?.city ?? "");
   const metadata = initial?.metadata ?? {};
+
+  const provinceOptions = Array.from(new Set([
+    ...Object.keys(PROVINCE_CITIES),
+    ...(initial?.region ? [initial.region] : []),
+  ]));
+  const cityOptions = Array.from(new Set([
+    ...(PROVINCE_CITIES[selectedRegion] ?? []),
+    ...(selectedRegion === initial?.region && initial?.city ? [initial.city] : []),
+  ]));
+
+  useEffect(() => {
+    if (pending) {
+      actionWasPending.current = true;
+      return;
+    }
+    if (!actionWasPending.current) return;
+    actionWasPending.current = false;
+    setIsSubmitting(false);
+    setIsSavingDraft(false);
+  }, [pending]);
+
+  useEffect(() => {
+    if (state.success && submittedIntent.current === "submit") {
+      router.push("/updates");
+    }
+  }, [state, router]);
 
   const showPreview = () => {
     if (!formRef.current) return;
@@ -86,13 +149,28 @@ export function PublishForm({
     event.preventDefault();
     const submitter = (event.nativeEvent as SubmitEvent).submitter;
     const formData = new FormData(event.currentTarget, submitter ?? undefined);
+    if (submitter instanceof HTMLButtonElement && submitter.name) {
+      formData.set(submitter.name, submitter.value);
+    }
+    if (!formData.has("intent")) {
+      formData.set("intent", "submit");
+    }
+    const body = String(formData.get("body") ?? "");
+    if (/1[3-9]\d{9}/.test(body) || /\d{16,19}/.test(body)) {
+      alert("正文不允许包含手机号或银行卡号");
+      return;
+    }
+    const intent = formData.get("intent") === "draft" ? "draft" : "submit";
+    submittedIntent.current = intent;
+    setIsSavingDraft(intent === "draft");
+    setIsSubmitting(intent === "submit");
     startTransition(() => formAction(formData));
   };
 
   const uploadFiles = async (files: FileList | null) => {
     if (!files?.length) return;
-    if (attachments.length + files.length > 9) {
-      setUploadError("每篇内容最多上传9张图片");
+    if (attachments.length + files.length > MAX_IMAGES) {
+      setUploadError(`每篇内容最多上传${MAX_IMAGES}张图片`);
       return;
     }
     setUploading(true);
@@ -183,14 +261,21 @@ export function PublishForm({
         <div className="publish-field">
           <span>图片</span>
           <label className="upload-box">
-            <input type="file" accept="image/jpeg,image/png,image/webp" multiple disabled={uploading} onChange={(event) => uploadFiles(event.target.files)} />
+            <input type="file" accept="image/jpeg,image/png,image/webp" multiple disabled={uploading || attachments.length >= MAX_IMAGES} onChange={(event) => uploadFiles(event.target.files)} />
             <b>{uploading ? "上传中…" : "+ 添加图片"}</b>
-            <small>JPG、PNG、WebP，单张不超过10MB，最多9张</small>
+            <small>JPG、PNG、WebP，单张不超过10MB，最多{MAX_IMAGES}张</small>
           </label>
           {attachments.length > 0 && (
-            <ul className="uploaded-files">
-              {attachments.map((attachment) => <li key={attachment.id}>✓ {attachment.fileName}</li>)}
-            </ul>
+            <div className="uploaded-images">
+              {attachments.map((attachment) => (
+                <img
+                  key={attachment.id}
+                  src={`/api/uploads/${attachment.id}`}
+                  alt={attachment.fileName}
+                  loading="lazy"
+                />
+              ))}
+            </div>
           )}
           {uploadError && <small className="auth-field-error">{uploadError}</small>}
         </div>
@@ -208,15 +293,42 @@ export function PublishForm({
         </fieldset>
 
         <div className="publish-row">
-          <TextField name="region" label="省份/地区" defaultValue={initial?.region} placeholder="如：广东省；全国可留空" />
-          <TextField name="city" label="城市" defaultValue={initial?.city} placeholder="如：深圳市" />
+          <label className="publish-field">
+            <span>省份/地区</span>
+            <select
+              name="region"
+              value={selectedRegion}
+              onChange={(event) => {
+                setSelectedRegion(event.target.value);
+                setSelectedCity("");
+              }}
+            >
+              <option value="">全国 / 不限</option>
+              {provinceOptions.map((province) => (
+                <option key={province} value={province}>{province}</option>
+              ))}
+            </select>
+          </label>
+          <label className="publish-field">
+            <span>城市</span>
+            <select
+              name="city"
+              value={selectedCity}
+              onChange={(event) => setSelectedCity(event.target.value)}
+            >
+              <option value="">{selectedRegion ? "不限 / 请选择" : "请先选择省份"}</option>
+              {cityOptions.map((city) => (
+                <option key={city} value={city}>{city}</option>
+              ))}
+            </select>
+          </label>
         </div>
 
         <TextField name="tags" label="话题" defaultValue={initial?.tags.join("，")} placeholder="多个话题用逗号分隔" />
 
         {moduleSlug === "updates" && (
           <>
-            <fieldset className="publish-fieldset contact-fieldset">
+            <fieldset className="publish-fieldset">
               <legend>联系方式 <em>*</em> <small>至少填写一项，仅注册用户点击“搭把手”后可见</small></legend>
               <div className="publish-row">
                 <TextField name="contactPhone" label="手机号码" type="tel" defaultValue={metadata.contactPhone || defaultContact.phone} placeholder="请输入常用手机号码" />
@@ -284,9 +396,9 @@ export function PublishForm({
 
         <div className="publish-actions">
           <Link href="/account/content" className="btn-ghost">取消</Link>
-          <button type="submit" name="intent" value="draft" className="btn-ghost" formNoValidate disabled={pending || uploading}>保存草稿</button>
+          <button type="submit" name="intent" value="draft" className="btn-ghost" formNoValidate disabled={isSavingDraft || isSubmitting || uploading}>{isSavingDraft ? "保存中…" : "保存草稿"}</button>
           <button type="button" className="btn-ghost" onClick={showPreview}>预览</button>
-          <button type="submit" name="intent" value="submit" className="btn-primary" disabled={pending || uploading}>{pending ? "处理中…" : "提交审核"}</button>
+          <button type="submit" name="intent" value="submit" className="btn-primary" disabled={isSubmitting || isSavingDraft || uploading}>{isSubmitting ? "发布中…" : "发布"}</button>
         </div>
       </form>
 

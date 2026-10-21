@@ -52,7 +52,6 @@ export default async function PublishPage({
       <main className="publish-page">
         <header className="publish-page-head">
           <span className="home-eyebrow">发布{config.label}</span>
-          <h1>{content ? "继续编辑" : `发布${config.label}`}</h1>
           <p>{config.description}</p>
         </header>
         <PublishForm
