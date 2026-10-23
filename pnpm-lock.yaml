@@ -136,6 +136,9 @@ importers:
       cheerio:
         specifier: ^1.2.0
         version: 1.2.0
+      cn-division:
+        specifier: 2026.0.1
+        version: 2026.0.1
       iconv-lite:
         specifier: ^0.7.3
         version: 0.7.3
@@ -1444,6 +1447,9 @@ packages:
   cliui@9.0.1:
     resolution: {integrity: sha512-k7ndgKhwoQveBL+/1tqGJYNz097I7WOvwbmmU2AR5+magtbjPWQTS1C5vzGkBC8Ym8UWRzfKUzUUqFLypY4Q+w==}
     engines: {node: '>=20'}
+
+  cn-division@2026.0.1:
+    resolution: {integrity: sha512-KQm4TofXkYF0qB8KZn4E2mxYKPGWDaptdD3dPYQCxhtTZya+9SNuWfQ0lZNGUBrX4BguST4SBH3CnAewQ6X/pQ==}
 
   codepage@1.15.0:
     resolution: {integrity: sha512-3g6NUTPd/YtuuGrhMnOMRjFc+LJw/bnMp3+0r/Wcz3IXUuCosKRJvMphm5+Q+bvTVGcJJuRvVLuYba+WojaFaA==}
@@ -4354,6 +4360,8 @@ snapshots:
       string-width: 7.2.0
       strip-ansi: 7.2.0
       wrap-ansi: 9.0.2
+
+  cn-division@2026.0.1: {}
 
   codepage@1.15.0: {}
 

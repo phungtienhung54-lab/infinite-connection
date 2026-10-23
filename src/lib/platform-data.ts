@@ -3,6 +3,7 @@
 // 在接后端时可直接对应到接口字段。
 
 // import updatesData from './updates-data.json';
+import type { ReviewStatus } from './review-status';
 import fundingsData from './fundings-data.json';
 import jobsData from './jobs-scraped.json';
 import toolsData from './tools-data.json';
@@ -298,8 +299,10 @@ export type FundingItem = {
   dueDays: number;
   due: string;
   publishedDays: number;
-  /** 抓取时根据截止日期判断的状态（真实数据） */
-  status?: "开放中" | "已截止";
+  /** 人工审核状态；抓取快照默认 PENDING，缺省的历史数据视为已发布 */
+  status?: ReviewStatus;
+  /** 抓取时根据截止日期判断的申报状态（真实数据） */
+  openStatus?: "开放中" | "已截止";
   /** 抓取来源名称（真实数据） */
   sourceName?: string;
   /** 原帖发布日期（真实数据，YYYY-MM-DD） */
@@ -532,6 +535,8 @@ export type JobItem = {
   location: string;
   salary: string;
   due: string;
+  /** 人工审核状态；抓取快照默认 PENDING，缺省的历史数据视为已发布 */
+  status?: ReviewStatus;
   /** 抓取来源名称（真实数据） */
   sourceName?: string;
   /** 原始招聘链接（真实数据），有值时“投递简历”跳原始帖子 */
@@ -561,6 +566,8 @@ export type ToolItem = {
   downloads: number;
   rating: number;
   publishedDays: number;
+  /** 人工审核状态；抓取快照默认 PENDING，缺省的历史数据视为已发布 */
+  status?: ReviewStatus;
 };
 
 export const tools: ToolItem[] = toolsData as unknown as ToolItem[];
@@ -775,6 +782,7 @@ const publicInterestFields = [
   "女性关怀",
   "创新探索",
   "社区营造",
+  "应急救援",
   "其他",
 ];
 

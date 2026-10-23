@@ -1667,10 +1667,47 @@
   font-size: 12px;
 }
 
+.publish-row.location-row {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.upload-count {
+  color: var(--pc-text-3);
+  font-size: 12px;
+  font-weight: 400;
+}
+
 .uploaded-images {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
+}
+
+.uploaded-image {
+  position: relative;
+  margin: 0;
+}
+
+.uploaded-image-remove {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 24px;
+  height: 24px;
+  border: none;
+  border-radius: 50%;
+  background: rgba(32, 50, 41, 0.72);
+  color: #fff;
+  font-size: 12px;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.uploaded-image-remove:hover {
+  background: var(--pc-pink-text);
 }
 
 .uploaded-images img {
@@ -2095,6 +2132,7 @@
 
 @media (max-width: 760px) {
   .publish-row,
+  .publish-row.location-row,
   .publish-specific-grid,
   .profile-form,
   .publish-entry-grid,

@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { filterGroups, type JobItem } from "@/lib/platform-data";
+import { isPublished } from "@/lib/review-status";
 import scrapedJobs from "@/lib/jobs-scraped.json";
 import { TypeTabs, FilterRow, SearchInput, EmptyState } from "./platform-ui";
 
@@ -18,10 +19,13 @@ function dedupeByTitle<T extends { title: string }>(items: T[]): T[] {
 }
 
 const initialJobs = dedupeByTitle(
-  (scrapedJobs as unknown as JobItem[]).map((job) => ({
-    ...job,
-    id: String(job.id),
-  })),
+  (scrapedJobs as unknown as JobItem[])
+    // 只展示通过人工审核的岗位；历史快照没有 status 字段，视为已发布。
+    .filter(isPublished)
+    .map((job) => ({
+      ...job,
+      id: String(job.id),
+    })),
 );
 type JobCategory = NonNullable<JobItem["category"]>;
 

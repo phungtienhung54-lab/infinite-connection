@@ -7,6 +7,7 @@ import {
   filterGroups,
   type FundingItem,
 } from "@/lib/platform-data";
+import { isPublished } from "@/lib/review-status";
 import {
   TypeTabs,
   FilterRow,
@@ -34,7 +35,7 @@ type FundingWithRemainingDays = FundingItem & { remainingDays: number | null };
 const isExpiredFunding = (funding: FundingWithRemainingDays) =>
   funding.remainingDays !== null
     ? funding.remainingDays < 0
-    : funding.status === "已截止";
+    : funding.openStatus === "已截止";
 
 function dedupeByTitleAndOrg<T extends { title: string; org: string }>(items: T[]): T[] {
   const seen = new Set<string>();
@@ -46,7 +47,8 @@ function dedupeByTitleAndOrg<T extends { title: string; org: string }>(items: T[
   });
 }
 
-const uniqueFundings = dedupeByTitleAndOrg(fundings);
+// 只展示通过人工审核的数据；历史快照没有 status 字段，视为已发布。
+const uniqueFundings = dedupeByTitleAndOrg(fundings.filter(isPublished));
 
 const sorts = [
   { key: "due", label: "截止最近" },
@@ -166,7 +168,7 @@ export function FundingBrowser() {
     { label: "当前收录", value: String(activeFundings.length) },
     { label: "资金资助", value: String(activeFundings.filter((funding) => funding.supportType === "资金").length) },
     { label: "物资资助", value: String(activeFundings.filter((funding) => funding.supportType === "物资").length) },
-    { label: "开放中", value: String(activeFundings.filter((funding) => funding.status === "开放中").length) },
+    { label: "开放中", value: String(activeFundings.filter((funding) => funding.openStatus === "开放中").length) },
     { label: "发布机构", value: String(new Set(activeFundings.map((funding) => funding.org)).size) },
   ];
 
@@ -239,11 +241,11 @@ export function FundingBrowser() {
                   <span className={`tag ${kindTagClass[f.kind] ?? "tag-green"}`}>{f.type}</span>
                   <span className="tag tag-pink">{f.field}</span>
                   <span className="spacer" />
-                  {f.status === "已截止" ? (
+                  {f.openStatus === "已截止" ? (
                     <span className="tag tag-red">已截止</span>
                   ) : (
                     <>
-                      {f.status === "开放中" && <span className="tag tag-green">开放中</span>}
+                      {f.openStatus === "开放中" && <span className="tag tag-green">开放中</span>}
                       {f.remainingDays !== null && f.remainingDays > 0 ? (
                         <span
                           className={`tag ${
@@ -253,7 +255,7 @@ export function FundingBrowser() {
                           {f.remainingDays}天截止
                         </span>
                       ) : (
-                        f.status !== "开放中" && (
+                        f.openStatus !== "开放中" && (
                           <span className="tag tag-yellow">
                             {f.due === "长期有效" ? "长期有效" : "详见原帖"}
                           </span>

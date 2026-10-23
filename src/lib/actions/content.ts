@@ -83,12 +83,15 @@ export async function saveContent(
     .filter(Boolean)
     .slice(0, 10);
   const attachmentIds = [...new Set(formData.getAll("attachmentIds").map(String).filter(Boolean))];
-  const nextStatus = values.intent === "submit" ? "PENDING_REVIEW" : "DRAFT";
+  // 点击“发布”直接写入 PUBLISHED，草稿仍保存为 DRAFT。
+  const nextStatus = values.intent === "submit" ? "PUBLISHED" : "DRAFT";
 
   if (attachmentIds.length > 6) return { error: "每篇内容最多上传6张图片" };
 
   if (values.intent === "submit") {
     const fieldErrors: Record<string, string[]> = {};
+    if (!values.region) fieldErrors.region = ["请选择省份/地区"];
+    if (!values.city) fieldErrors.city = ["请选择城市"];
     if (values.title.length < 4 || values.title === "未命名草稿") fieldErrors.title = ["标题至少4个字符"];
     if (values.body.length < 10) fieldErrors.body = ["正文至少10个字符"];
     if (fields.length === 0 || fields.some((field) => !publicInterestFields.includes(field))) {
@@ -140,6 +143,8 @@ export async function saveContent(
     }
   }
 
+  const now = new Date();
+  const isPublishing = values.intent === "submit";
   const data = {
     module: config.module,
     subtype: values.subtype,
@@ -153,7 +158,9 @@ export async function saveContent(
     metadata,
     status: nextStatus,
     rejectionReason: null,
-    submittedAt: values.intent === "submit" ? new Date() : null,
+    submittedAt: isPublishing ? now : null,
+    reviewedAt: isPublishing ? now : null,
+    publishedAt: isPublishing ? now : null,
   } as const;
 
   const content = values.contentId
@@ -181,14 +188,14 @@ export async function saveContent(
     });
   }
 
-  if (values.intent === "submit") {
+  if (isPublishing) {
     await prisma.notification.create({
       data: {
         userId: session.user.id,
-        type: "REVIEW_RESULT",
-        title: "内容已提交审核",
-        message: `“${content.title}”已进入审核队列。`,
-        href: "/account/content",
+        type: "SYSTEM",
+        title: "内容已发布",
+        message: `“${content.title}”已发布到${config.label}。`,
+        href: moduleHref[config.module],
       },
     });
   }
@@ -199,7 +206,7 @@ export async function saveContent(
   return {
     success: true,
     contentId: content.id,
-    message: values.intent === "submit" ? "已提交审核" : "草稿已保存",
+    message: isPublishing ? "已发布" : "草稿已保存",
   };
 }
 

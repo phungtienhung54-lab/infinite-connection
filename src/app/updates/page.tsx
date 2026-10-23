@@ -1,19 +1,73 @@
 import { SiteHeader } from "@/components/SiteHeader";
 import { PlatformFooter } from "@/components/PlatformFooter";
 import { UpdatesBrowser } from "@/components/UpdatesBrowser";
-import { PublishedContentSection } from "@/components/PublishedContentSection";
+import { prisma } from "@/lib/db";
+import { formatRelativeHours, hoursSince } from "@/lib/relative-time";
+import type { UpdateItem } from "@/lib/platform-data";
 import "../platform.css";
+
+// 列表数据来自数据库，禁用缓存以保证发布后立刻可见。
+export const dynamic = "force-dynamic";
 
 export const metadata = {
   title: "项目动态 · 无限连接",
 };
 
-export default function UpdatesPage() {
+function readMetadata(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {};
+}
+
+export default async function UpdatesPage() {
+  const contents = await prisma.content.findMany({
+    where: { module: "UPDATE", status: "PUBLISHED" },
+    include: {
+      author: { include: { organization: true } },
+      attachments: { orderBy: { createdAt: "asc" }, take: 3 },
+    },
+    orderBy: { publishedAt: "desc" },
+    take: 50,
+  });
+
+  const items: UpdateItem[] = contents.map((content) => {
+    const publishedAt = content.publishedAt ?? content.createdAt;
+    const publishedHours = hoursSince(publishedAt);
+    const metadata = readMetadata(content.metadata);
+    const period = [metadata.periodStart, metadata.periodEnd]
+      .filter((value): value is string => typeof value === "string" && value.length > 0)
+      .join(" 至 ") || "长期";
+
+    return {
+      id: content.id,
+      kind: "最新动态",
+      posterType: content.author.accountType === "ORGANIZATION" ? "机构" : "个人",
+      field: content.fields[0] ?? "其他",
+      region: content.region ?? "全国",
+      rating: 0,
+      publishedHours,
+      time: formatRelativeHours(publishedHours),
+      source: "来自 项目主页",
+      org: content.author.organization?.name ?? content.author.name ?? "公益伙伴",
+      title: content.title,
+      content: content.summary || content.body,
+      hashtags: content.tags,
+      location: [content.region, content.city].filter(Boolean).join(" · ") || "全国",
+      period,
+      media: content.attachments.length > 0
+        ? { icon: "🖼️", tone: "green", caption: `${content.attachments.length}张现场图` }
+        : undefined,
+      shares: 0,
+      comments: 0,
+      likes: 0,
+      helps: 0,
+    };
+  });
+
   return (
     <div className="module-page">
       <SiteHeader active="updates" />
-      <UpdatesBrowser />
-      <PublishedContentSection module="UPDATE" />
+      <UpdatesBrowser items={items} />
       <PlatformFooter />
     </div>
   );

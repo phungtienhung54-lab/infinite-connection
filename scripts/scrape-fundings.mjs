@@ -26,6 +26,7 @@ import * as cheerio from "cheerio";
 
 const ROOT = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const OUT = path.join(ROOT, "src/lib/fundings-data.json");
+const REVIEW_STATUSES = new Set(["PENDING", "PUBLISHED", "REJECTED"]);
 const UA = "InfiniteConnectionPreview/0.1 (+https://github.com/schneiderlin/infinite-connection)";
 const BROWSER_UA =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Safari/537.36";
@@ -216,7 +217,7 @@ function inferLocation(address) {
 
 function inferField(text) {
   const rules = [
-    [/救灾|应急|灾害|减灾|防灾|救援/, "社区营造"],
+    [/救灾|应急|灾害|减灾|防灾|救援/, "应急救援"],
     [/气候|环境|生态|低碳|环保|碳中和|生物多样性/, "生态环保"],
     [/残障|无障碍|心智障碍|视障|听障|孤独症/, "残障融合"],
     [/老人|老龄|养老|老年|银龄/, "老龄关怀"],
@@ -387,7 +388,7 @@ function buildFunding({ title, owner, address, beginDay, endDay, body, url, sour
   const location = inferLocation(address);
   const publishDate = beginDay || todayISO();
   const due = endDay || (/长期|招满|申请完|滚动|常年/.test(body) ? "长期有效" : "详见原帖");
-  const status = endDay && endDay < todayISO() ? "已截止" : "开放中";
+  const openStatus = endDay && endDay < todayISO() ? "已截止" : "开放中";
   const amount = parseAmount(body);
   const summary = excerpt(body, 190) || `${title}（来源：${sourceName}）`;
   return {
@@ -407,7 +408,9 @@ function buildFunding({ title, owner, address, beginDay, endDay, body, url, sour
     dueDays: daysUntil(endDay),
     due,
     publishedDays: daysSince(publishDate),
-    status,
+    // status 表示人工审核状态（新抓取记录一律待审）；openStatus 表示申报通道是否开放。
+    status: "PENDING",
+    openStatus,
     sourceName,
     publishedDate: publishDate,
     url,
@@ -872,6 +875,23 @@ function dedupe(items) {
 }
 
 async function main() {
+  // 抓取会重建整份资助快照；先读取旧快照，保住人工审核状态和已审核分类。
+  // 历史快照没有 status 时按“已发布”处理，避免每次重跑都把线上记录变成待审。
+  let existing = [];
+  try {
+    existing = JSON.parse(await readFile(OUT, "utf8"));
+    console.log(`已有记录：${existing.length} 条（将保留审核状态与已审核分类）`);
+  } catch {
+    console.log("未找到既有 fundings-data.json，将从空列表开始。");
+  }
+
+  const previousByUrl = new Map(
+    existing.filter((item) => item.url).map((item) => [item.url, item]),
+  );
+  const previousByTitle = new Map(
+    existing.map((item) => [`${item.title}|${item.org}`, item]),
+  );
+
   const [cdbFundings, cdbNews, crcf, cncf, cpwf] = await Promise.all([
     scrapeCDBFundings(),
     scrapeCDBNews(),
@@ -879,18 +899,41 @@ async function main() {
     scrapeCNCF(),
     scrapeCPWF(),
   ]);
-  const all = dedupe([...cdbFundings, ...cdbNews, ...crcf, ...cncf, ...cpwf]).sort((a, b) => {
-    if (a.status !== b.status) return a.status === "开放中" ? -1 : 1;
-    return a.publishedDays - b.publishedDays;
-  });
+
+  const all = dedupe([...cdbFundings, ...cdbNews, ...crcf, ...cncf, ...cpwf])
+    .map((item) => {
+      const previous =
+        previousByUrl.get(item.url) ??
+        previousByTitle.get(`${item.title}|${item.org}`);
+      if (!previous) return item;
+
+      const status = REVIEW_STATUSES.has(previous.status)
+        ? previous.status
+        : "PUBLISHED";
+      return {
+        ...item,
+        status,
+        // 已发布记录的领域是人工审核过的，抓取规则不能覆盖它。
+        ...(status === "PUBLISHED" && previous.field
+          ? { field: previous.field }
+          : {}),
+        ...(previous.aiSuggestedCategory
+          ? { aiSuggestedCategory: previous.aiSuggestedCategory }
+          : {}),
+      };
+    })
+    .sort((a, b) => {
+      if (a.openStatus !== b.openStatus) return a.openStatus === "开放中" ? -1 : 1;
+      return a.publishedDays - b.publishedDays;
+    });
 
   await writeFile(OUT, `${JSON.stringify(all, null, 2)}\n`, "utf8");
 
   console.log("\n写入完成：", OUT);
-  console.log(`总计 ${all.length} 条（开放中 ${all.filter((item) => item.status === "开放中").length} 条）`);
+  console.log(`总计 ${all.length} 条（开放中 ${all.filter((item) => item.openStatus === "开放中").length} 条）`);
   for (const item of all) {
     console.log(
-      `- [${item.status}] ${item.publishedDate} | ${item.supportType} | ${item.type} | ${item.org} | ${item.title}`,
+      `- [${item.openStatus}] ${item.publishedDate} | ${item.supportType} | ${item.type} | ${item.org} | ${item.title}`,
     );
   }
 }

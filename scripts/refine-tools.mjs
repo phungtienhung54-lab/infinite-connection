@@ -65,6 +65,21 @@ const DEFAULT_STYLE = {
   action: "⬇ 下载报告",
 };
 
+// 新闻宣传稿特征：结业 / 活动报道 / 政策解读，不是可报名的课程。
+// 这些词出现在标题或摘要里时，禁止继续归入“培训课程”，统一落到“其他”。
+const NEWS_RELEASE_PATTERN =
+  /圆满结束|顺利举办|圆满落幕|圆满收官|圆满完成|成功举办|顺利举行|圆满举行|顺利召开|圆满召开|结业|开班|解读|宣贯|新闻稿|宣传报道|举办$/;
+
+const NEWS_RELEASE_STYLE = {
+  category: "其他",
+  tone: "sky",
+  icon: "📰",
+  action: "查看来源",
+};
+
+// 抓取脚本写入的新记录为 PENDING；历史快照没有 status 时按已发布处理。
+const REVIEW_STATUSES = new Set(["PENDING", "PUBLISHED", "REJECTED"]);
+
 async function main() {
   console.log("🚀 开始自动清洗能力工具数据...\n");
 
@@ -76,6 +91,11 @@ async function main() {
 
   const refined = tools.map((tool) => {
     const text = `${tool.title} ${tool.summary}`;
+    // 已发布 / 历史无 status（视为已发布）的工具，分类和展示样式是人工审核结果，不再覆盖。
+    const isReviewed = tool.status === "PUBLISHED";
+    const isLegacyPublished = !tool.status;
+    const preserveStyle = isReviewed || isLegacyPublished;
+
     let matched = null;
 
     // 1. 尝试匹配规则
@@ -86,25 +106,37 @@ async function main() {
       }
     }
 
-    // 2. 应用匹配结果或默认值
-    const style = matched || DEFAULT_STYLE;
-    
+    // 2. 新闻宣传稿不能算培训课程；其余情况按匹配结果或默认值归类
+    const isNewsRelease =
+      NEWS_RELEASE_PATTERN.test(tool.title) || NEWS_RELEASE_PATTERN.test(text);
+    const style =
+      matched?.category === "培训课程" && isNewsRelease
+        ? NEWS_RELEASE_STYLE
+        : matched || DEFAULT_STYLE;
+
+    const finalStyle = preserveStyle
+      ? {
+          category: tool.category ?? style.category,
+          tone: tool.tone ?? style.tone,
+          icon: tool.icon ?? style.icon,
+          action: tool.action ?? style.action,
+        }
+      : style;
+
     // 统计分类数量
-    categoryCount[style.category] = (categoryCount[style.category] || 0) + 1;
-    
+    categoryCount[finalStyle.category] = (categoryCount[finalStyle.category] || 0) + 1;
+
     // 判断是否真正修改了数据（仅用于日志展示）
-    if (tool.category !== style.category) {
+    if (tool.category !== finalStyle.category) {
       console.log(`🔀 "${tool.title.substring(0, 30)}..."`);
-      console.log(`   原分类: ${tool.category}  ->  新分类: ${style.category}`);
+      console.log(`   原分类: ${tool.category}  ->  新分类: ${finalStyle.category}`);
       changedCount++;
     }
 
     return {
       ...tool,
-      category: style.category,
-      tone: style.tone,
-      icon: style.icon,
-      action: style.action,
+      ...finalStyle,
+      status: REVIEW_STATUSES.has(tool.status) ? tool.status : "PUBLISHED",
     };
   });
 

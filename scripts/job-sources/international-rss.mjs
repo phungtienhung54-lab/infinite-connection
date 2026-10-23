@@ -153,7 +153,14 @@ function httpsGetText(url, { userAgent = DEFAULT_UA, redirects = 3 } = {}) {
         res.setEncoding("utf8");
         let body = "";
         res.on("data", (chunk) => (body += chunk));
-        res.on("end", () => resolve(body));
+        res.on("end", () => {
+          // 202 + 空响应（例如上游 WAF 挑战页）不是有效 RSS，不能当作“0 条”静默通过。
+          if (!body.trim()) {
+            reject(new Error(`empty response (HTTP ${status})`));
+            return;
+          }
+          resolve(body);
+        });
         res.on("error", reject);
       },
     );

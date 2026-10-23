@@ -6,9 +6,18 @@ import Link from "next/link";
 import { saveContent, type ContentFormState } from "@/lib/actions/content";
 import {
   publicInterestFields,
+  moduleHref,
   type PublishModuleConfig,
   type PublishModuleSlug,
 } from "@/lib/publishing";
+import {
+  cityDisplayName,
+  composeCity,
+  getAreas,
+  getCities,
+  provinceNames,
+  resolveCityValue,
+} from "@/lib/cn-divisions";
 
 type InitialContent = {
   id: string;
@@ -26,34 +35,6 @@ type InitialContent = {
 
 const initialState: ContentFormState = {};
 const MAX_IMAGES = 6;
-
-const PROVINCE_CITIES: Record<string, string[]> = {
-  北京市: ["北京市"],
-  天津市: ["天津市"],
-  上海市: ["上海市"],
-  重庆市: ["重庆市"],
-  河北省: ["石家庄市", "唐山市", "保定市"],
-  辽宁省: ["沈阳市", "大连市"],
-  江苏省: ["南京市", "苏州市", "无锡市", "常州市"],
-  浙江省: ["杭州市", "宁波市", "温州市", "嘉兴市"],
-  安徽省: ["合肥市", "芜湖市"],
-  福建省: ["福州市", "厦门市", "泉州市"],
-  山东省: ["济南市", "青岛市", "烟台市"],
-  河南省: ["郑州市", "洛阳市"],
-  湖北省: ["武汉市", "宜昌市"],
-  湖南省: ["长沙市", "株洲市"],
-  广东省: ["广州市", "深圳市", "珠海市", "佛山市", "东莞市"],
-  海南省: ["海口市", "三亚市"],
-  四川省: ["成都市", "绵阳市"],
-  云南省: ["昆明市", "大理市"],
-  陕西省: ["西安市", "咸阳市"],
-  广西壮族自治区: ["南宁市", "桂林市"],
-  内蒙古自治区: ["呼和浩特市", "包头市"],
-  新疆维吾尔自治区: ["乌鲁木齐市"],
-  香港特别行政区: ["香港特别行政区"],
-  澳门特别行政区: ["澳门特别行政区"],
-  台湾省: ["台北市", "高雄市"],
-};
 
 function TextField({
   name,
@@ -109,18 +90,22 @@ export function PublishForm({
   const [attachments, setAttachments] = useState(initial?.attachments ?? []);
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState("");
-  const [selectedRegion, setSelectedRegion] = useState(initial?.region ?? "");
-  const [selectedCity, setSelectedCity] = useState(initial?.city ?? "");
+  const initialProvince = initial?.region ?? "";
+  const initialCity = resolveCityValue(initialProvince, initial?.city ?? "");
+  const [selectedRegion, setSelectedRegion] = useState(initialProvince);
+  const [selectedCity, setSelectedCity] = useState(initialCity.city);
+  const [selectedDistrict, setSelectedDistrict] = useState(initialCity.district);
+  const [legacyCity, setLegacyCity] = useState(
+    initial?.city && !initialCity.city ? initial.city : "",
+  );
   const metadata = initial?.metadata ?? {};
 
-  const provinceOptions = Array.from(new Set([
-    ...Object.keys(PROVINCE_CITIES),
-    ...(initial?.region ? [initial.region] : []),
-  ]));
-  const cityOptions = Array.from(new Set([
-    ...(PROVINCE_CITIES[selectedRegion] ?? []),
-    ...(selectedRegion === initial?.region && initial?.city ? [initial.city] : []),
-  ]));
+  const cityOptions = selectedRegion ? getCities(selectedRegion) : [];
+  const areaOptions = selectedRegion && selectedCity ? getAreas(selectedRegion, selectedCity) : [];
+  const citySelectValue = selectedCity || (legacyCity ? "__legacy__" : "");
+  const composedCity = selectedCity
+    ? composeCity(selectedRegion, selectedCity, selectedDistrict)
+    : legacyCity;
 
   useEffect(() => {
     if (pending) {
@@ -135,9 +120,10 @@ export function PublishForm({
 
   useEffect(() => {
     if (state.success && submittedIntent.current === "submit") {
-      router.push("/updates");
+      router.push(moduleHref[config.module]);
+      router.refresh();
     }
-  }, [state, router]);
+  }, [state, router, config.module]);
 
   const showPreview = () => {
     if (!formRef.current) return;
@@ -155,16 +141,28 @@ export function PublishForm({
     if (!formData.has("intent")) {
       formData.set("intent", "submit");
     }
-    const body = String(formData.get("body") ?? "");
-    if (/1[3-9]\d{9}/.test(body) || /\d{16,19}/.test(body)) {
-      alert("正文不允许包含手机号或银行卡号");
-      return;
-    }
     const intent = formData.get("intent") === "draft" ? "draft" : "submit";
+    if (intent === "submit") {
+      const region = String(formData.get("region") ?? "").trim();
+      const city = String(formData.get("city") ?? "").trim();
+      if (!region || !city) {
+        alert("请选择省份/地区和城市后再发布。");
+        return;
+      }
+      const body = String(formData.get("body") ?? "");
+      if (/1[3-9]\d{9}/.test(body) || /\d{16,19}/.test(body)) {
+        alert("正文中疑似包含手机号或银行卡号，请删除后再发布。");
+        return;
+      }
+    }
     submittedIntent.current = intent;
     setIsSavingDraft(intent === "draft");
     setIsSubmitting(intent === "submit");
     startTransition(() => formAction(formData));
+  };
+
+  const removeAttachment = (attachmentId: string) => {
+    setAttachments((items) => items.filter((item) => item.id !== attachmentId));
   };
 
   const uploadFiles = async (files: FileList | null) => {
@@ -259,7 +257,7 @@ export function PublishForm({
         </label>
 
         <div className="publish-field">
-          <span>图片</span>
+          <span>图片{attachments.length > 0 && <small className="upload-count">（{attachments.length}/{MAX_IMAGES}）</small>}</span>
           <label className="upload-box">
             <input type="file" accept="image/jpeg,image/png,image/webp" multiple disabled={uploading || attachments.length >= MAX_IMAGES} onChange={(event) => uploadFiles(event.target.files)} />
             <b>{uploading ? "上传中…" : "+ 添加图片"}</b>
@@ -268,12 +266,22 @@ export function PublishForm({
           {attachments.length > 0 && (
             <div className="uploaded-images">
               {attachments.map((attachment) => (
-                <img
-                  key={attachment.id}
-                  src={`/api/uploads/${attachment.id}`}
-                  alt={attachment.fileName}
-                  loading="lazy"
-                />
+                <figure key={attachment.id} className="uploaded-image">
+                  <img
+                    src={`/api/uploads/${attachment.id}`}
+                    alt={attachment.fileName}
+                    loading="lazy"
+                  />
+                  <button
+                    type="button"
+                    className="uploaded-image-remove"
+                    aria-label={`删除图片 ${attachment.fileName}`}
+                    title="删除图片"
+                    onClick={() => removeAttachment(attachment.id)}
+                  >
+                    ✕
+                  </button>
+                </figure>
               ))}
             </div>
           )}
@@ -292,33 +300,64 @@ export function PublishForm({
           </div>
         </fieldset>
 
-        <div className="publish-row">
+        <div className="publish-row location-row">
           <label className="publish-field">
-            <span>省份/地区</span>
+            <span>省份/地区<em>*</em></span>
             <select
               name="region"
               value={selectedRegion}
+              required
               onChange={(event) => {
                 setSelectedRegion(event.target.value);
                 setSelectedCity("");
+                setSelectedDistrict("");
+                setLegacyCity("");
               }}
             >
-              <option value="">全国 / 不限</option>
-              {provinceOptions.map((province) => (
+              <option value="">请选择省份/地区</option>
+              {provinceNames.map((province) => (
                 <option key={province} value={province}>{province}</option>
               ))}
+              {selectedRegion && !provinceNames.includes(selectedRegion) && (
+                <option value={selectedRegion}>{selectedRegion}</option>
+              )}
             </select>
           </label>
           <label className="publish-field">
-            <span>城市</span>
+            <span>城市<em>*</em></span>
             <select
-              name="city"
-              value={selectedCity}
-              onChange={(event) => setSelectedCity(event.target.value)}
+              value={citySelectValue}
+              required
+              disabled={!selectedRegion}
+              onChange={(event) => {
+                const value = event.target.value;
+                setSelectedDistrict("");
+                if (value === "__legacy__") {
+                  setSelectedCity("");
+                  return;
+                }
+                setSelectedCity(value);
+                setLegacyCity("");
+              }}
             >
-              <option value="">{selectedRegion ? "不限 / 请选择" : "请先选择省份"}</option>
+              <option value="">{selectedRegion ? "请选择城市" : "请先选择省份/地区"}</option>
               {cityOptions.map((city) => (
-                <option key={city} value={city}>{city}</option>
+                <option key={city} value={city}>{cityDisplayName(selectedRegion, city)}</option>
+              ))}
+              {legacyCity && <option value="__legacy__">{legacyCity}</option>}
+            </select>
+            <input type="hidden" name="city" value={composedCity} />
+          </label>
+          <label className="publish-field">
+            <span>区/县</span>
+            <select
+              value={selectedDistrict}
+              disabled={!selectedCity}
+              onChange={(event) => setSelectedDistrict(event.target.value)}
+            >
+              <option value="">{selectedCity ? "不限 / 请选择" : "请先选择城市"}</option>
+              {areaOptions.map((area) => (
+                <option key={area} value={area}>{area}</option>
               ))}
             </select>
           </label>
