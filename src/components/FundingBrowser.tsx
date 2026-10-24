@@ -2,12 +2,8 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import {
-  fundings,
-  filterGroups,
-  type FundingItem,
-} from "@/lib/platform-data";
-import { isPublished } from "@/lib/review-status";
+import { filterGroups } from "@/lib/platform-config";
+import type { FundingItem } from "@/lib/platform-types";
 import {
   TypeTabs,
   FilterRow,
@@ -47,9 +43,6 @@ function dedupeByTitleAndOrg<T extends { title: string; org: string }>(items: T[
   });
 }
 
-// 只展示通过人工审核的数据；历史快照没有 status 字段，视为已发布。
-const uniqueFundings = dedupeByTitleAndOrg(fundings.filter(isPublished));
-
 const sorts = [
   { key: "due", label: "截止最近" },
   { key: "amount", label: "金额最高" },
@@ -72,7 +65,7 @@ const kindTagClass: Record<string, string> = {
   物资: "tag-blue",
 };
 
-export function FundingBrowser() {
+export function FundingBrowser({ fundings }: { fundings: FundingItem[] }) {
   const [tab, setTab] = useState("全部");
   const [resourceType, setResourceType] = useState("全部");
   const [duration, setDuration] = useState("全部");
@@ -82,6 +75,7 @@ export function FundingBrowser() {
   const [search, setSearch] = useState("");
   const [sort, setSort] = useState("due");
   const selectedSupportType = tabToSupportType[tab];
+  const uniqueFundings = useMemo(() => dedupeByTitleAndOrg(fundings), [fundings]);
 
   const today = getShanghaiToday();
   const activeFundings = useMemo<FundingWithRemainingDays[]>(
@@ -92,7 +86,7 @@ export function FundingBrowser() {
           remainingDays: getRemainingDays(funding.due, today),
         }))
         .filter((funding) => !isExpiredFunding(funding)),
-    [today],
+    [today, uniqueFundings],
   );
   const fundingTabs = [
     { label: "全部", count: String(activeFundings.length) },

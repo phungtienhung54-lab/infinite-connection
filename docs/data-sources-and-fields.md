@@ -14,35 +14,41 @@
 | 人力资源 / 招聘 | [美丽中国支教·成为员工](http://www.meilizhongguo.org/join-us) | 已接入机构官网列表与详情页 | 6 条 |
 | 人力资源 / 招聘 | [ReliefWeb](https://reliefweb.int/jobs) | 已接入官方公开 RSS | 20 条中国或不限地点岗位 |
 | 人力资源 / 招聘 | [NGO Job Board](https://ngojobboard.org/) | 已接入官方公开 RSS | 8 条 |
-| 项目动态 | 无 | 未接入 | 静态 mock 数据 |
-| 资金 & 物资 | 无 | 未接入 | 静态 mock 数据 |
-| 能力工具 | 无 | 未接入 | 静态 mock 数据 |
+| 项目动态 | 站内用户发布 | 已接入数据库 | `Content` 中已发布记录 |
+| 资金 & 物资 | 中国发展简报、中国红十字基金会、中国慈展会、中国人口福利基金会 | 管理员本地采集与审核；网站读取数据库 | `Content` 中已发布记录 |
+| 能力工具 | `scripts/scrape-tools.mjs` 配置的公开来源 | 管理员本地采集与审核；网站读取数据库 | `Content` 中已发布记录 |
 
 候选招聘来源来自 [`references/公益招聘网站信息库.xlsx`](./references/公益招聘网站信息库.xlsx)。2026-10-13 生成的当前快照共 68 条；各来源原始结果合计 71 条，统一入口按原始 URL 和“机构 + 标题”去重后保留 68 条。候选清单不代表已经接入，也不代表链接、采集许可或字段仍然有效。
 
 ## 当前采集链路
 
-当前没有常驻爬虫、定时任务、数据库或 Next.js 后端接口。采集是手动生成静态快照：
+当前没有常驻爬虫或定时任务。采集脚本仍由管理员手动运行并生成审核快照，但网站页面不再直接 import 这些 JSON 文件：
 
 ```text
 pnpm scrape:jobs
   → 请求来源列表接口
   → 来源专用转换逻辑
   → src/lib/jobs-scraped.json
-  → JobsBrowser 在构建/开发时静态 import
-  → /hr 默认只展示抓取快照
+  → 管理员在本地清洗与审核
+
+网站请求
+  → PlatformDataSource 接口
+  → PrismaPlatformDataSource
+  → Postgres Content 表中的 PUBLISHED 记录
+  → Server Component 把数据作为 props 传给 Browser 组件
 ```
 
 - 脚本：[`scripts/scrape-jobs.mjs`](../scripts/scrape-jobs.mjs)
 - 快照：[`src/lib/jobs-scraped.json`](../src/lib/jobs-scraped.json)
-- 页面接入：[`src/components/JobsBrowser.tsx`](../src/components/JobsBrowser.tsx)
+- 数据读取接口：[`src/lib/platform-data-source.ts`](../src/lib/platform-data-source.ts)
+- 当前数据库实现：[`src/lib/prisma-platform-data-source.ts`](../src/lib/prisma-platform-data-source.ts)
+- 页面组件：[`src/components/JobsBrowser.tsx`](../src/components/JobsBrowser.tsx)
 - 每个来源适配器最多输出 20 条；公共招聘网的三个关键词各只请求第一页，机构官网只读取当前公开列表，RSS 只读取当前 feed。启动 `pnpm dev` 不会自动刷新。
 - 快照本身没有 `scrapedAt`、来源版本或本次采集报告等元数据。
-- 抓取脚本写入的新记录默认带 `status: "PENDING"`；清洗脚本会保留已发布记录及其分类，历史快照没有 `status` 字段时按已发布处理。`FundingBrowser`、`JobsBrowser`、`ToolsBrowser` 只渲染已发布（`PUBLISHED` 或历史缺失 `status`）的记录，`PENDING` / `REJECTED` 不展示。首页的岗位数量统计同样只计入已审核记录。
+- 抓取脚本写入的新记录默认带 `status: "PENDING"`，供管理员机器上的清洗与审核流程使用。网站只查询数据库中 `Content.status = PUBLISHED` 的记录；Browser 组件不再读取或解释快照审核状态。
 - 资助模块把“申报通道是否开放”拆到 `openStatus`（`开放中` / `已截止`），`status` 只表示人工审核状态。
 - 一键执行「抓取 → 清洗 → AI 辅助分类 → 导出 Excel」：`pnpm scrape:all`（`scripts/run-all.mjs`），依次运行 3 个抓取、3 个清洗、`ai-classify.mjs` 和导出脚本；任一步失败会立即停止并返回非零退出码。AI 分类默认每个数据集抽样 5 条，可用 `AI_CLASSIFY_LIMIT`（1-50）扩大样本。
-- 首页“人力资源”入口的当前收录岗位数和机构数也由这份快照计算。
-- 侧栏的“当前收录机构”和“当前远程岗位”由这份快照计算；来源不能支持的“急招岗位”“本月新增岗位”“累计投递”显示“无法计算”，不再使用 mock 值。
+- 首页和各模块侧栏的当前收录数量均由数据库查询结果计算，不再使用快照或 mock 数值。
 
 ## 导出审核用 Excel
 

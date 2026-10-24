@@ -2,9 +2,8 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { toolTabs, filterGroups } from "@/lib/platform-data";
-import { isPublished } from "@/lib/review-status";
-import rawTools from "@/lib/tools-data.json";
+import { toolTabs, filterGroups } from "@/lib/platform-config";
+import type { ToolItem } from "@/lib/platform-types";
 import {
   TypeTabs,
   FilterRow,
@@ -12,90 +11,6 @@ import {
   ListMeta,
   EmptyState,
 } from "./platform-ui";
-
-/* ---------- 原始数据 → ToolItem 适配 ---------- */
-
-type RawTool = (typeof rawTools)[number] & { provider?: string };
-
-type ToolItem = {
-  id: string;
-  category: string;
-  field: string;
-  forms: string[];
-  duration: string;
-  title: string;
-  summary: string;
-  publisher: string;
-  tone: string;
-  icon: string;
-  priceTag: string;
-  meta: string;
-  price?: string;
-  action: string;
-  publishedDays: number;
-  downloads: number;
-  rating: number;
-  url: string;
-};
-
-const TONE_MAP: Record<string, string> = {
-  "#e8f5e9": "green",
-  "#fdf6ec": "orange",
-  "#e3f2fd": "blue",
-  "#f3e5f5": "purple",
-  "#fce4ec": "pink",
-  "#e0f2f1": "teal",
-  "#e8eaf6": "indigo",
-};
-
-const OTHER_CATEGORY_PATTERN = /纪念册|会刊|活动册|相册/;
-
-// 新闻宣传稿（结业 / 活动报道 / 政策解读）不是可报名的课程，不能出现在“培训课程”里。
-const TRAINING_NEWS_PATTERN =
-  /圆满结束|顺利举办|圆满落幕|圆满收官|圆满完成|成功举办|顺利举行|圆满举行|顺利召开|圆满召开|结业|开班|解读|宣贯|新闻稿|宣传报道|举办$/;
-
-function resolveCategory(raw: RawTool): string {
-  if (OTHER_CATEGORY_PATTERN.test(raw.title)) return "其他";
-  if (raw.category === "培训课程" && TRAINING_NEWS_PATTERN.test(raw.title)) return "其他";
-  return raw.category;
-}
-
-function actionLabel(category: string): string {
-  if (category === "公益工具模板库") return "⬇ 获取模板";
-  if (category === "行业报告") return "⬇ 查看报告";
-  if (category === "培训课程") return "查看课程";
-  return "查看来源";
-}
-
-function adapt(raw: RawTool): ToolItem {
-  const metaParts = [raw.dateText, raw.locationText].filter(Boolean);
-  const category = resolveCategory(raw);
-  return {
-    id: String(raw.id),
-    category,
-    field: raw.domain || "",
-    forms: raw.format ? [raw.format] : [],
-    duration: raw.period || "",
-    title: raw.title,
-    summary: raw.summary,
-    publisher: raw.provider?.trim() || raw.org?.trim() || "平台官方",
-    tone: TONE_MAP[raw.color || ""] || "green",
-    icon: raw.icon || "📦",
-    priceTag: raw.isFree ? "免费" : "商业付费",
-    meta: metaParts.join(" · "),
-    price: raw.isFree ? "" : raw.priceText,
-    action: actionLabel(category),
-    publishedDays: raw.publishedDays ?? 0,
-    downloads: 0,
-    rating: 5,
-    url: raw.url,
-  };
-}
-
-const tools: ToolItem[] = (rawTools as RawTool[])
-  // 只展示通过人工审核的数据；历史快照没有 status 字段，视为已发布。
-  .filter(isPublished)
-  .map(adapt);
 
 const knownToolCategories = new Set(
   toolTabs
@@ -139,7 +54,7 @@ const tabFilters: Record<string, { fields: string[]; forms: string[]; showDurati
 
 /* ---------- 组件 ---------- */
 
-export function ToolsBrowser() {
+export function ToolsBrowser({ tools }: { tools: ToolItem[] }) {
   const [tab, setTab] = useState("全部");
   const [field, setField] = useState("全部");
   const [form, setForm] = useState("全部");
@@ -166,7 +81,7 @@ export function ToolsBrowser() {
       rating: (a: ToolItem, b: ToolItem) => b.rating - a.rating,
     }[sort];
     return [...list].sort(by);
-  }, [tab, field, form, duration, search, sort]);
+  }, [tools, tab, field, form, duration, search, sort]);
 
   const toggle = (
     set: Set<string>,

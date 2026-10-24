@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import type { UpdateItem } from "@/lib/platform-data";
+import type { UpdateItem } from "@/lib/platform-types";
 import {
   FilterRow,
   SearchInput,
@@ -34,21 +34,23 @@ function avatarTone(org: string): string {
 }
 
 export function UpdatesBrowser({ items }: { items: UpdateItem[] }) {
-  // 右侧栏展示数据必须在组件内部写死，不引用 platform-data 中的示例热门项目。
   const platformStats = [
-    { label: "在线项目", value: "0", tone: "green" },
-    { label: "累计动态", value: "0", tone: "orange" },
-    { label: "活跃机构", value: "0", tone: "blue" },
-    { label: "参与用户", value: "0", tone: "purple" },
+    { label: "累计动态", value: String(items.length), tone: "orange" },
+    { label: "活跃机构", value: String(new Set(items.map((item) => item.org)).size), tone: "blue" },
   ];
 
-  const hotProjects = [
-    { rank: 1, title: "测试-XXX基金会", meta: "互动 0 · 评分 0.0" },
-    { rank: 2, title: "项目1", meta: "互动 0 · 评分 0.0" },
-    { rank: 3, title: "项目2", meta: "互动 0 · 评分 0.0" },
-    { rank: 4, title: "项目3", meta: "互动 0 · 评分 0.0" },
-    { rank: 5, title: "项目4", meta: "互动 0 · 评分 0.0" },
-  ];
+  const hotProjects = [...items]
+    .sort(
+      (a, b) =>
+        b.likes + b.comments + b.shares + b.helps -
+        (a.likes + a.comments + a.shares + a.helps),
+    )
+    .slice(0, 5)
+    .map((item, index) => ({
+      rank: index + 1,
+      title: item.title,
+      meta: `互动 ${item.likes + item.comments + item.shares + item.helps} · ${item.org}`,
+    }));
 
   const [field, setField] = useState("全部");
   const [region, setRegion] = useState("全部");
@@ -257,20 +259,22 @@ export function UpdatesBrowser({ items }: { items: UpdateItem[] }) {
           </div>
         </div>
 
-        <div className="aside-card">
-          <h2 className="aside-title">🔥 热门项目 TOP 5</h2>
-          <ol className="hot-list">
-            {hotProjects.map((p) => (
-              <li key={p.rank}>
-                <span className="rank-badge">{p.rank}</span>
-                <div>
-                  <div className="hot-title">{p.title}</div>
-                  <div className="hot-meta">{p.meta}</div>
-                </div>
-              </li>
-            ))}
-          </ol>
-        </div>
+        {hotProjects.length > 0 && (
+          <div className="aside-card">
+            <h2 className="aside-title">🔥 热门项目 TOP 5</h2>
+            <ol className="hot-list">
+              {hotProjects.map((p) => (
+                <li key={p.rank}>
+                  <span className="rank-badge">{p.rank}</span>
+                  <div>
+                    <div className="hot-title">{p.title}</div>
+                    <div className="hot-meta">{p.meta}</div>
+                  </div>
+                </li>
+              ))}
+            </ol>
+          </div>
+        )}
       </aside>
 
     </div>
