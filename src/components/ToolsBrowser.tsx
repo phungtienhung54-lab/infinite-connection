@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { toolTabs, filterGroups } from "@/lib/platform-data";
+import { isPublished } from "@/lib/review-status";
 import rawTools from "@/lib/tools-data.json";
 import {
   TypeTabs,
@@ -49,6 +50,16 @@ const TONE_MAP: Record<string, string> = {
 
 const OTHER_CATEGORY_PATTERN = /纪念册|会刊|活动册|相册/;
 
+// 新闻宣传稿（结业 / 活动报道 / 政策解读）不是可报名的课程，不能出现在“培训课程”里。
+const TRAINING_NEWS_PATTERN =
+  /圆满结束|顺利举办|圆满落幕|圆满收官|圆满完成|成功举办|顺利举行|圆满举行|顺利召开|圆满召开|结业|开班|解读|宣贯|新闻稿|宣传报道|举办$/;
+
+function resolveCategory(raw: RawTool): string {
+  if (OTHER_CATEGORY_PATTERN.test(raw.title)) return "其他";
+  if (raw.category === "培训课程" && TRAINING_NEWS_PATTERN.test(raw.title)) return "其他";
+  return raw.category;
+}
+
 function actionLabel(category: string): string {
   if (category === "公益工具模板库") return "⬇ 获取模板";
   if (category === "行业报告") return "⬇ 查看报告";
@@ -58,7 +69,7 @@ function actionLabel(category: string): string {
 
 function adapt(raw: RawTool): ToolItem {
   const metaParts = [raw.dateText, raw.locationText].filter(Boolean);
-  const category = OTHER_CATEGORY_PATTERN.test(raw.title) ? "其他" : raw.category;
+  const category = resolveCategory(raw);
   return {
     id: String(raw.id),
     category,
@@ -81,7 +92,10 @@ function adapt(raw: RawTool): ToolItem {
   };
 }
 
-const tools: ToolItem[] = (rawTools as RawTool[]).map(adapt);
+const tools: ToolItem[] = (rawTools as RawTool[])
+  // 只展示通过人工审核的数据；历史快照没有 status 字段，视为已发布。
+  .filter(isPublished)
+  .map(adapt);
 
 const knownToolCategories = new Set(
   toolTabs

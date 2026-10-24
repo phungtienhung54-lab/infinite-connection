@@ -8,7 +8,11 @@
     "start": "next start",
     "lint": "eslint",
     "storage:cors": "node scripts/configure-storage-cors.mjs",
-    "scrape:jobs": "node --use-env-proxy scripts/scrape-jobs.mjs"
+    "scrape:jobs": "node --use-env-proxy scripts/scrape-jobs.mjs",
+    "scrape:all": "node scripts/run-all.mjs",
+    "classify:ai": "node scripts/ai-classify.mjs",
+    "export:excel": "node scripts/export-to-excel.mjs",
+    "import:excel": "node scripts/import-from-excel.mjs"
   },
   "dependencies": {
     "@auth/prisma-adapter": "^2.11.3",
@@ -20,6 +24,7 @@
     "@prisma/client": "^7.10.0",
     "bcryptjs": "^3.0.3",
     "cheerio": "^1.2.0",
+    "cn-division": "2026.0.1",
     "iconv-lite": "^0.7.3",
     "next": "16.3.5",
     "next-auth": "5.0.0-beta.32",

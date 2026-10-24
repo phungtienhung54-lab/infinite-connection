@@ -1,11 +1,7 @@
 "use client";
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import {
-  updates as initialUpdates,
-  filterGroups,
-  type UpdateItem,
-} from "@/lib/platform-data";
+import type { UpdateItem } from "@/lib/platform-data";
 import {
   FilterRow,
   SearchInput,
@@ -15,7 +11,7 @@ import {
 
 
 const sorts = [
-  { key: "new", label: "最新发布（3天内）" },
+  { key: "new", label: "最新发布" },
   { key: "rating", label: "评分最高" },
   { key: "hot", label: "互动最多" },
 ];
@@ -37,7 +33,7 @@ function avatarTone(org: string): string {
   return avatarTones[h % avatarTones.length];
 }
 
-export function UpdatesBrowser() {
+export function UpdatesBrowser({ items }: { items: UpdateItem[] }) {
   // 右侧栏展示数据必须在组件内部写死，不引用 platform-data 中的示例热门项目。
   const platformStats = [
     { label: "在线项目", value: "0", tone: "green" },
@@ -54,7 +50,6 @@ export function UpdatesBrowser() {
     { rank: 5, title: "项目4", meta: "互动 0 · 评分 0.0" },
   ];
 
-  const [items] = useState<UpdateItem[]>(initialUpdates.slice(0, 1));
   const [field, setField] = useState("全部");
   const [region, setRegion] = useState("全部");
   const [search, setSearch] = useState("");
@@ -63,6 +58,15 @@ export function UpdatesBrowser() {
   const [liked, setLiked] = useState<Set<string>>(new Set());
   const [helped, setHelped] = useState<Set<string>>(new Set());
   const [shared, setShared] = useState<Set<string>>(new Set());
+
+  const fieldOptions = useMemo(
+    () => ["全部", ...Array.from(new Set(items.map((item) => item.field).filter(Boolean)))],
+    [items],
+  );
+  const regionOptions = useMemo(
+    () => ["全部", ...Array.from(new Set(items.map((item) => item.region).filter(Boolean)))],
+    [items],
+  );
 
   const filtered = useMemo(() => {
     const q = search.trim();
@@ -78,10 +82,11 @@ export function UpdatesBrowser() {
           u.hashtags.some((h) => h.includes(q))),
     );
     if (sort === "new") {
-      list = list.filter((u) => u.publishedHours <= 72);
+      // 数据库内容可能有较久之前发布的，这里只调整顺序，不做时间过滤，避免老内容被隐藏。
+      list = [...list].sort((a, b) => a.publishedHours - b.publishedHours);
+      return list;
     }
     const by = {
-      new: (a: UpdateItem, b: UpdateItem) => a.publishedHours - b.publishedHours,
       rating: (a: UpdateItem, b: UpdateItem) => b.rating - a.rating,
       hot: (a: UpdateItem, b: UpdateItem) =>
         b.likes + b.comments + b.shares - (a.likes + a.comments + a.shares),
@@ -108,10 +113,10 @@ export function UpdatesBrowser() {
       <div className="module-main">
         <div className="filter-panel">
           <div className="pc-card filter-box">
-            <FilterRow label="领域" options={filterGroups.fields} active={field} onChange={setField} />
+            <FilterRow label="领域" options={fieldOptions} active={field} onChange={setField} />
           </div>
           <div className="pc-card filter-box">
-            <FilterRow label="地域" options={filterGroups.regions} active={region} onChange={setRegion} />
+            <FilterRow label="地域" options={regionOptions} active={region} onChange={setRegion} />
           </div>
           <div className="pc-card filter-box">
             <div className="filter-row">
@@ -155,7 +160,7 @@ export function UpdatesBrowser() {
               <article key={u.id} className="pc-card feed-card">
                 <div className="card-head">
                   <span className={`tag ${fieldTagClass[u.field] ?? "tag-green"}`}>{u.field}</span>
-                  <span className="tag tag-rating">⭐ {u.rating.toFixed(1)}</span>
+                  {u.rating > 0 && <span className="tag tag-rating">⭐ {u.rating.toFixed(1)}</span>}
                   <span className="spacer" />
                   <span className="card-time">{u.time}更新</span>
                 </div>

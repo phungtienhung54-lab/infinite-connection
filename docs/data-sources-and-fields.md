@@ -38,8 +38,43 @@ pnpm scrape:jobs
 - 页面接入：[`src/components/JobsBrowser.tsx`](../src/components/JobsBrowser.tsx)
 - 每个来源适配器最多输出 20 条；公共招聘网的三个关键词各只请求第一页，机构官网只读取当前公开列表，RSS 只读取当前 feed。启动 `pnpm dev` 不会自动刷新。
 - 快照本身没有 `scrapedAt`、来源版本或本次采集报告等元数据。
+- 抓取脚本写入的新记录默认带 `status: "PENDING"`；清洗脚本会保留已发布记录及其分类，历史快照没有 `status` 字段时按已发布处理。`FundingBrowser`、`JobsBrowser`、`ToolsBrowser` 只渲染已发布（`PUBLISHED` 或历史缺失 `status`）的记录，`PENDING` / `REJECTED` 不展示。首页的岗位数量统计同样只计入已审核记录。
+- 资助模块把“申报通道是否开放”拆到 `openStatus`（`开放中` / `已截止`），`status` 只表示人工审核状态。
+- 一键执行「抓取 → 清洗 → AI 辅助分类 → 导出 Excel」：`pnpm scrape:all`（`scripts/run-all.mjs`），依次运行 3 个抓取、3 个清洗、`ai-classify.mjs` 和导出脚本；任一步失败会立即停止并返回非零退出码。AI 分类默认每个数据集抽样 5 条，可用 `AI_CLASSIFY_LIMIT`（1-50）扩大样本。
 - 首页“人力资源”入口的当前收录岗位数和机构数也由这份快照计算。
 - 侧栏的“当前收录机构”和“当前远程岗位”由这份快照计算；来源不能支持的“急招岗位”“本月新增岗位”“累计投递”显示“无法计算”，不再使用 mock 值。
+
+## 导出审核用 Excel
+
+三份快照可以用 `pnpm run export:excel` 导出成便于人工审核的表格，输出目录 `docs/exports/`：
+
+| 快照 | 输出文件 | 当前记录数 |
+| --- | --- | --- |
+| `src/lib/fundings-data.json` | `docs/exports/fundings.xlsx` | 78 |
+| `src/lib/jobs-scraped.json` | `docs/exports/jobs.xlsx` | 211 |
+| `src/lib/tools-data.json` | `docs/exports/tools.xlsx` | 1095 |
+
+- 脚本：[`scripts/export-to-excel.mjs`](../scripts/export-to-excel.mjs)，基于已有 `xlsx` 依赖直接写 `.xlsx`，不会出现 CSV 用 Excel 打开时的 UTF-8 乱码问题。
+- 表头为中文且列顺序固定；`tags` 等数组字段用 `, ` 拼成字符串，布尔值转成“是 / 否”。
+- 每条记录的前四列是审核列：`审核状态`、`原始分类`、`AI建议分类`、`最终发布分类`。`审核状态` 为 `PENDING`（前端不展示）或 `PUBLISHED`（前端展示）；历史快照没有 `status` 时按 `PUBLISHED` 导出。`最终发布分类` 初始等于原始分类，供运营修改。
+- 链接列写成可点击的 Excel 超链接，并带表头筛选与列宽；JSON 出现未配置的新字段时会自动追加到表格末尾，不会静默丢数据。每个工作簿另带一个「使用说明」工作表。
+- 目标文件正被 Excel / WPS 打开时，脚本会先重试；仍然失败会提示先关闭同名文件。需要导出到其他目录（CI、临时排查）时设置 `EXPORT_OUT_DIR`，默认仍是 `docs/exports/`。
+
+## 导入人工审核结果
+
+运营把 Excel 的 `审核状态` 改为 `PUBLISHED`（或 `PENDING` / `REJECTED`）并确认 `最终发布分类` 后，运行：
+
+```text
+pnpm import:excel
+```
+
+脚本 [`scripts/import-from-excel.mjs`](../scripts/import-from-excel.mjs) 会读取 `docs/exports/` 下的三份表格，并按记录 ID 写回对应快照：
+
+- `PUBLISHED`：用 `最终发布分类` 覆盖 JSON 中的分类字段（资助 `field`、岗位 `role`、工具 `category`）；原 `status` 为 `PENDING` / `REJECTED` 时改为 `PUBLISHED`，历史缺失 `status` 的记录已按已发布处理，不强制补写。
+- `PENDING` / `REJECTED`：同步 `status`，不覆盖分类；此时若修改了 `最终发布分类`，会打印“未应用”的警告。
+- `最终发布分类` 为空：保留原分类并打印警告。
+- 容错：表头改名、新增列、表头不在第一行、缺少可选列、未知记录 ID、重复 ID、无法识别的审核状态都会打印警告并尽量继续；缺少记录 ID / 审核状态 / 最终发布分类时跳过该文件，不影响其他文件。
+- `pnpm import:excel -- --dry-run` 只统计不写回；`pnpm import:excel -- --dataset jobs` 只导入招聘表；联调时可用 `--in-dir` 和 `--data-dir` 指向临时目录。
 
 ## 来源： 中国发展简报·NGO 招聘
 

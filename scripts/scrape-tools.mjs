@@ -100,6 +100,8 @@ function makeTool({
 }) {
   return {
     id: `tool-${hashId(url)}`,
+    // 新抓取记录默认待审，人工审核改为 PUBLISHED 后才会在前端展示。
+    status: "PENDING",
     category,
     title: clean(title).slice(0, 180),
     url,
@@ -223,8 +225,13 @@ async function scrapeCGPI() {
 
 /* ---------- 来源 3：中国慈善联合会 · 培训动态 ---------- */
 
+// 新闻宣传稿特征：结业 / 活动报道 / 政策解读，不是可报名的课程，不能归入“培训课程”。
+const NEWS_RELEASE_PATTERN =
+  /圆满结束|顺利举办|圆满落幕|圆满收官|圆满完成|成功举办|顺利举行|圆满举行|顺利召开|圆满召开|结业|开班|解读|宣贯|新闻稿|宣传报道|举办$/;
+
 function inferTrainingCategory(title) {
-  return /沙龙|圆桌|研讨会|交流会|论坛|年会/.test(title) ? "行业沙龙会议" : "培训课程";
+  if (/沙龙|圆桌|研讨会|交流会|论坛|年会/.test(title)) return "行业沙龙会议";
+  return NEWS_RELEASE_PATTERN.test(title) ? "其他" : "培训课程";
 }
 
 async function scrapeCharityAlliance() {

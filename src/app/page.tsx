@@ -2,10 +2,13 @@ import Link from "next/link";
 import { SiteHeader } from "@/components/SiteHeader";
 import { PlatformFooter } from "@/components/PlatformFooter";
 import scrapedJobs from "@/lib/jobs-scraped.json";
+import { isPublished } from "@/lib/review-status";
 import "./platform.css";
 
-const scrapedJobCount = scrapedJobs.length;
-const scrapedOrgCount = new Set(scrapedJobs.map((job) => job.org)).size;
+// 首页统计同样只计入审核通过的岗位，待审快照不能提前曝光。
+const publishedJobs = scrapedJobs.filter(isPublished);
+const scrapedJobCount = publishedJobs.length;
+const scrapedOrgCount = new Set(publishedJobs.map((job) => job.org)).size;
 
 const modules = [
   {

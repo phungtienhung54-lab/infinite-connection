@@ -7,12 +7,12 @@
  *   - 明确排除商业公司（有限公司、管理咨询、文化发展公司、猎头/劳务等）；
  *   - 志愿者岗位单独归入“志愿者招募”，不混入人员招聘。
  *
- * 来源：
+ * 来源（只接入公益垂类与机构官网，不接入综合商业招聘平台）：
  *   1. 中国发展简报 · NGO招聘（全量 209 条列表接口）
- *   2. 中国公共招聘网（公益/社会服务关键词）
+ *   2. 中国公共招聘网（公益/社会服务关键词，政府公共就业平台）
  *   3. 壹基金 · 工作机会
  *   4. 美丽中国支教 · 成为员工
- *   5. ReliefWeb / NGO Job Board 公开 RSS
+ *   5. ReliefWeb / NGO Job Board 公开 RSS（国际公益 / 人道主义招聘）
  *
  * 抓取约定：
  *   - 固定可识别 User-Agent；请求间隔 ≥ 1.5s；
@@ -24,7 +24,7 @@
  * 输出：src/lib/jobs-scraped.json（JobsBrowser / platform-data 直接 import）
  */
 
-import { writeFile } from "node:fs/promises";
+import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { domesticOrganizationSources } from "./job-sources/domestic-organizations.mjs";
@@ -33,6 +33,7 @@ import { publicJobSources } from "./job-sources/public-jobs.mjs";
 
 const ROOT = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const OUT = path.join(ROOT, "src/lib/jobs-scraped.json");
+const REVIEW_STATUSES = new Set(["PENDING", "PUBLISHED", "REJECTED"]);
 const UA = "InfiniteConnectionPreview/0.1 (+https://github.com/schneiderlin/infinite-connection)";
 const CDB_PAGE_SIZE = 500;
 const PER_SOURCE = 20;
@@ -202,6 +203,7 @@ async function scrapeCDB() {
 
 /* ---------- 主流程 ---------- */
 
+// 招聘渠道只保留公益垂类平台与机构官网；综合商业招聘平台不在采集范围。
 const sources = [
   { name: "中国发展简报·NGO招聘", scrape: scrapeCDB },
   ...publicJobSources,
@@ -249,6 +251,21 @@ function dedupeKey(job) {
   return `${text(job.org)}|${text(job.title)}`;
 }
 
+// 抓取会重建整份岗位快照；先读取旧快照，保住人工审核状态和已审核岗位类别。
+// 历史快照没有 status 时按“已发布”处理，避免每次重跑都把线上岗位变成待审。
+let existing = [];
+try {
+  existing = JSON.parse(await readFile(OUT, "utf8"));
+  console.log(`已有记录：${existing.length} 条（将保留审核状态与已审核岗位类别）`);
+} catch {
+  console.log("未找到既有 jobs-scraped.json，将从空列表开始。");
+}
+
+const previousByUrl = new Map(
+  existing.filter((job) => job.url?.trim()).map((job) => [job.url.trim(), job]),
+);
+const previousByKey = new Map(existing.map((job) => [dedupeKey(job), job]));
+
 const seenUrls = new Set();
 const seenJobs = new Set();
 const unique = filtered.filter((job) => {
@@ -260,9 +277,29 @@ const unique = filtered.filter((job) => {
   return true;
 });
 
+// 所有来源统一打上待审标记；但同一条旧岗位重新抓到时，沿用已有人工审核状态和岗位类别。
 const normalized = unique
   .sort((a, b) => a.publishedDays - b.publishedDays)
-  .map((job, idx) => ({ id: 10001 + idx, ...job }));
+  .map((job, idx) => {
+    const url = job.url?.trim();
+    const previous = (url && previousByUrl.get(url)) || previousByKey.get(dedupeKey(job));
+    const status = previous
+      ? REVIEW_STATUSES.has(previous.status)
+        ? previous.status
+        : "PUBLISHED"
+      : "PENDING";
+
+    return {
+      id: 10001 + idx,
+      ...job,
+      ...(previous?.aiSuggestedCategory
+        ? { aiSuggestedCategory: previous.aiSuggestedCategory }
+        : {}),
+      // 已发布岗位的类别是人工审核过的，抓取规则不能覆盖它。
+      ...(status === "PUBLISHED" && previous?.role ? { role: previous.role } : {}),
+      status,
+    };
+  });
 
 await writeFile(OUT, JSON.stringify(normalized, null, 2) + "\n", "utf8");
 
