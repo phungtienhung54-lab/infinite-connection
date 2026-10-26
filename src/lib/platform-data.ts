@@ -16,11 +16,17 @@ export type UpdateMedia = {
   caption: string;
 };
 
+export type UpdateImage = {
+  id: string;
+  fileName: string;
+};
+
 export type UpdateItem = {
   id: string;
   kind: "最新动态" | "项目主页" | "志愿活动" | "行业活动";
   posterType: "机构" | "个人";
   field: string;
+  fields?: string[];
   region: string;
   rating: number;
   publishedHours: number;
@@ -32,11 +38,14 @@ export type UpdateItem = {
   hashtags: string[];
   location: string;
   period: string;
+  images?: UpdateImage[];
   media?: UpdateMedia;
   shares: number;
   comments: number;
   likes: number;
   helps: number;
+  isLiked?: boolean;
+  isHelped?: boolean;
 };
 
 export const updates: UpdateItem[] = [
@@ -841,7 +850,24 @@ export const filterGroups = {
   fundingOther: ["全部", "最新发布（一周内）", "只看资助", "只看需求"],
   regions: ["全部", ...provinceOptions],
   jobKinds: ["全部", "全职", "兼职", "实习"],
-  jobRoles: ["全部", "项目官员", "传播", "财务", "人力资源", "高级管理", "督导", "筹款", "法务", "研究", "社工", "其他"],
+  jobRoles: [
+    "全部",
+    "项目官员",
+    "项目执行",
+    "社工",
+    "传播",
+    "筹款",
+    "国际项目",
+    "研究",
+    "财务",
+    "人力资源",
+    "高级管理",
+    "督导",
+    "法务",
+    "志愿者管理",
+    "技术开发",
+    "其他",
+  ],
   jobRegions: ["全国", "线上", ...provinceOptions],
   volunteerPeriods: ["全部", "短期", "长期"],
   volunteerFields: ["全部", "项目执行", "活动执行", "传播", "人力资源", "督导", "筹款", "法务", "研究", "评估", "技术开发"],

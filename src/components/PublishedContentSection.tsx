@@ -1,19 +1,45 @@
 import Image from "next/image";
 import type { ContentModule } from "@prisma/client";
+import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
-import { HelpContactButton } from "@/components/HelpContactButton";
+import { ContentActions } from "@/components/ContentActions";
 
 export async function PublishedContentSection({ module }: { module: ContentModule }) {
   const contents = await prisma.content.findMany({
     where: { module, status: "PUBLISHED" },
     include: {
       author: { include: { organization: true } },
-      attachments: { take: 3, orderBy: { createdAt: "asc" } },
+      attachments: {
+        select: { id: true, fileName: true },
+        take: 3,
+        orderBy: { createdAt: "asc" },
+      },
     },
     orderBy: { publishedAt: "desc" },
     take: 20,
   });
   if (contents.length === 0) return null;
+
+  const session = module === "UPDATE" ? await auth() : null;
+  const userId = session?.user?.id;
+  const contentIds = contents.map((content) => content.id);
+  let likedIds = new Set<string>();
+  let helpedIds = new Set<string>();
+
+  if (module === "UPDATE" && userId && contentIds.length > 0) {
+    const [likes, helps] = await Promise.all([
+      prisma.like.findMany({
+        where: { userId, contentId: { in: contentIds } },
+        select: { contentId: true },
+      }),
+      prisma.help.findMany({
+        where: { userId, contentId: { in: contentIds } },
+        select: { contentId: true },
+      }),
+    ]);
+    likedIds = new Set(likes.map((like) => like.contentId));
+    helpedIds = new Set(helps.map((help) => help.contentId));
+  }
 
   return (
     <section className="published-section">
@@ -35,7 +61,6 @@ export async function PublishedContentSection({ module }: { module: ContentModul
               </div>
             </div>
             <h3>{content.title}</h3>
-            {content.summary && <p className="preview-summary">{content.summary}</p>}
             <p className="published-body">{content.body}</p>
             {content.attachments.length > 0 && (
               <div className="published-images">
@@ -46,12 +71,19 @@ export async function PublishedContentSection({ module }: { module: ContentModul
             )}
             <div className="card-meta">📍 {[content.region, content.city].filter(Boolean).join(" · ") || "全国"}{content.tags.length > 0 && ` · ${content.tags.map((tag) => `#${tag}`).join(" ")}`}</div>
             {module === "UPDATE" && (
-              <div className="feed-actions published-feed-actions">
-                <span className="feed-action">↗ 分享</span>
-                <span className="feed-action">💬 评论</span>
-                <span className="feed-action">👍 点赞</span>
-                <HelpContactButton contentId={content.id} />
-              </div>
+              <ContentActions
+                key={`${content.id}:${content.likesCount}:${likedIds.has(content.id)}:${content.helpsCount}:${helpedIds.has(content.id)}`}
+                contentId={content.id}
+                title={content.title}
+                text={content.body}
+                href={`/updates/${content.id}`}
+                likesCount={content.likesCount}
+                commentsCount={content.commentsCount}
+                helpsCount={content.helpsCount}
+                isLiked={likedIds.has(content.id)}
+                isHelped={helpedIds.has(content.id)}
+                className="published-feed-actions"
+              />
             )}
           </article>
         ))}
