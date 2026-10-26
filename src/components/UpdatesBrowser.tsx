@@ -2,14 +2,9 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import type { UpdateItem } from "@/lib/platform-data";
-import {
-  FilterRow,
-  SearchInput,
-  EmptyState,
-} from "./platform-ui";
+import type { UpdateItem } from "@/lib/platform-types";
+import { FilterRow, SearchInput, EmptyState } from "./platform-ui";
 import { ContentActions } from "./ContentActions";
-
 
 const sorts = [
   { key: "new", label: "最新发布" },
@@ -43,21 +38,23 @@ export function UpdatesBrowser({
   fieldOptions?: string[];
   regionOptions?: string[];
 }) {
-  // 右侧栏展示数据必须在组件内部写死，不引用 platform-data 中的示例热门项目。
   const platformStats = [
-    { label: "在线项目", value: "0", tone: "green" },
-    { label: "累计动态", value: "0", tone: "orange" },
-    { label: "活跃机构", value: "0", tone: "blue" },
-    { label: "参与用户", value: "0", tone: "purple" },
+    { label: "累计动态", value: String(items.length), tone: "orange" },
+    { label: "活跃机构", value: String(new Set(items.map((item) => item.org)).size), tone: "blue" },
   ];
 
-  const hotProjects = [
-    { rank: 1, title: "测试-XXX基金会", meta: "互动 0 · 评分 0.0" },
-    { rank: 2, title: "项目1", meta: "互动 0 · 评分 0.0" },
-    { rank: 3, title: "项目2", meta: "互动 0 · 评分 0.0" },
-    { rank: 4, title: "项目3", meta: "互动 0 · 评分 0.0" },
-    { rank: 5, title: "项目4", meta: "互动 0 · 评分 0.0" },
-  ];
+  const hotProjects = [...items]
+    .sort(
+      (a, b) =>
+        (b.likes || 0) + (b.comments || 0) + (b.shares || 0) + (b.helps || 0) -
+        ((a.likes || 0) + (a.comments || 0) + (a.shares || 0) + (a.helps || 0)),
+    )
+    .slice(0, 5)
+    .map((item, index) => ({
+      rank: index + 1,
+      title: item.title,
+      meta: `互动 ${(item.likes || 0) + (item.comments || 0) + (item.shares || 0) + (item.helps || 0)} · ${item.org}`,
+    }));
 
   const [field, setField] = useState("全部");
   const [region, setRegion] = useState("全部");
@@ -65,21 +62,21 @@ export function UpdatesBrowser({
   const [sort, setSort] = useState("new");
   const [poster, setPoster] = useState<"全部" | "机构" | "个人">("全部");
 
-  // 基础词表 + 数据库实际值合并：既完整平铺，也不遗漏内容里自定义的领域/地域。
-  const fieldOptions = useMemo(
-    () => Array.from(new Set([
-      ...baseFieldOptions,
-      ...items.flatMap((item) => (item.fields?.length ? item.fields : [item.field])).filter(Boolean),
-    ])),
-    [baseFieldOptions, items],
-  );
-  const regionOptions = useMemo(
-    () => Array.from(new Set([
-      ...baseRegionOptions,
-      ...items.map((item) => item.region).filter(Boolean),
-    ])),
-    [baseRegionOptions, items],
-  );
+  // 动态生成筛选词
+  const fieldOptions = useMemo(() => {
+    const set = new Set<string>(["全部"]);
+    items.forEach(item => {
+      if (item.fields && item.fields.length > 0) item.fields.forEach(f => set.add(f));
+      else if (item.field) set.add(item.field);
+    });
+    return Array.from(set);
+  }, [items]);
+
+  const regionOptions = useMemo(() => {
+    const set = new Set<string>(["全部"]);
+    items.forEach(item => { if (item.region) set.add(item.region); });
+    return Array.from(set);
+  }, [items]);
 
   const filtered = useMemo(() => {
     const q = search.trim();
@@ -92,19 +89,17 @@ export function UpdatesBrowser({
           u.title.includes(q) ||
           u.org.includes(q) ||
           u.content.includes(q) ||
-          u.hashtags.some((h) => h.includes(q))),
+          (u.hashtags || []).some((h) => h.includes(q))),
     );
     if (sort === "new") {
-      // 数据库内容可能有较久之前发布的，这里只调整顺序，不做时间过滤，避免老内容被隐藏。
-      list = [...list].sort((a, b) => a.publishedHours - b.publishedHours);
-      return list;
+      return [...list].sort((a, b) => (a.publishedHours || 0) - (b.publishedHours || 0));
     }
     const by = {
-      rating: (a: UpdateItem, b: UpdateItem) => b.rating - a.rating,
+      rating: (a: UpdateItem, b: UpdateItem) => (b.rating || 0) - (a.rating || 0),
       hot: (a: UpdateItem, b: UpdateItem) =>
-        b.likes + b.comments + b.shares + b.helps
-        - (a.likes + a.comments + a.shares + a.helps),
-    }[sort];
+        (b.likes || 0) + (b.comments || 0) + (b.shares || 0) + (b.helps || 0)
+        - ((a.likes || 0) + (a.comments || 0) + (a.shares || 0) + (a.helps || 0)),
+    }[sort as "rating" | "hot"];
     return [...list].sort(by);
   }, [items, field, region, search, sort, poster]);
 
@@ -194,10 +189,9 @@ export function UpdatesBrowser({
                 <h3 className="card-title">{u.title}</h3>
                 <p className="feed-content">
                   {u.content}
-                  {u.hashtags.map((h) => (
+                  {(u.hashtags || []).map((h) => (
                     <span key={h} className="hashtag">
-                      {" "}
-                      #{h}#
+                      {" "}#{h}#
                     </span>
                   ))}
                 </p>
@@ -238,12 +232,12 @@ export function UpdatesBrowser({
                   title={u.title}
                   text={u.content}
                   href={`/updates/${u.id}`}
-                  likesCount={u.likes}
-                  commentsCount={u.comments}
-                  shares={u.shares}
-                  helpsCount={u.helps}
-                  isLiked={u.isLiked}
-                  isHelped={u.isHelped}
+                  likesCount={u.likes || 0}
+                  commentsCount={u.comments || 0}
+                  shares={u.shares || 0}
+                  helpsCount={u.helps || 0}
+                  isLiked={u.isLiked || false}
+                  isHelped={u.isHelped || false}
                 />
               </article>
             ))}
@@ -268,22 +262,23 @@ export function UpdatesBrowser({
           </div>
         </div>
 
-        <div className="aside-card">
-          <h2 className="aside-title">🔥 热门项目 TOP 5</h2>
-          <ol className="hot-list">
-            {hotProjects.map((p) => (
-              <li key={p.rank}>
-                <span className="rank-badge">{p.rank}</span>
-                <div>
-                  <div className="hot-title">{p.title}</div>
-                  <div className="hot-meta">{p.meta}</div>
-                </div>
-              </li>
-            ))}
-          </ol>
-        </div>
+        {hotProjects.length > 0 && (
+          <div className="aside-card">
+            <h2 className="aside-title">🔥 热门项目 TOP 5</h2>
+            <ol className="hot-list">
+              {hotProjects.map((p) => (
+                <li key={p.rank}>
+                  <span className="rank-badge">{p.rank}</span>
+                  <div>
+                    <div className="hot-title">{p.title}</div>
+                    <div className="hot-meta">{p.meta}</div>
+                  </div>
+                </li>
+              ))}
+            </ol>
+          </div>
+        )}
       </aside>
-
     </div>
   );
 }

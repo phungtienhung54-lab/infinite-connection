@@ -1,51 +1,56 @@
 import Link from "next/link";
 import { SiteHeader } from "@/components/SiteHeader";
 import { PlatformFooter } from "@/components/PlatformFooter";
-import scrapedJobs from "@/lib/jobs-scraped.json";
-import { isPublished } from "@/lib/review-status";
+import { platformDataSource } from "@/lib/platform-data-source-instance";
+import type { JobItem } from "@/lib/platform-types";
 import "./platform.css";
 
-// 首页统计同样只计入审核通过的岗位，待审快照不能提前曝光。
-const publishedJobs = scrapedJobs.filter(isPublished);
-const scrapedJobCount = publishedJobs.length;
-const scrapedOrgCount = new Set(publishedJobs.map((job) => job.org)).size;
+function platformModules(fundingCount: number, jobs: JobItem[], toolCount: number) {
+  const organizationCount = new Set(jobs.map((job) => job.org)).size;
+  return [
+    {
+      href: "/updates",
+      icon: "📣",
+      tone: "mint",
+      name: "项目动态",
+      desc: "像刷微博一样看公益项目进展：最新动态、项目主页、志愿活动、行业活动。",
+      meta: "查看最新项目动态",
+    },
+    {
+      href: "/funding",
+      icon: "💰",
+      tone: "orange",
+      name: "资金 & 物资",
+      desc: "基金会资助、政府购买、企业CSR、招标采购与合作共建，一网打尽申报机会。",
+      meta: `${fundingCount} 条当前收录资源`,
+    },
+    {
+      href: "/hr",
+      icon: "💼",
+      tone: "blue",
+      name: "人力资源",
+      desc: "汇集公开来源的公益行业全职 / 兼职 / 实习岗位，并保留原站投递入口。",
+      meta: `${jobs.length} 条当前收录岗位 · ${organizationCount} 家当前收录机构`,
+    },
+    {
+      href: "/tools",
+      icon: "🧰",
+      tone: "purple",
+      name: "能力工具",
+      desc: "培训课程、行业沙龙、工具模板、行业报告、标准与经验文章。",
+      meta: `${toolCount} 件当前收录工具`,
+    },
+  ];
+}
 
-const modules = [
-  {
-    href: "/updates",
-    icon: "📣",
-    tone: "mint",
-    name: "项目动态",
-    desc: "像刷微博一样看公益项目进展：最新动态、项目主页、志愿活动、行业活动。",
-    meta: "428 个在线项目 · 3,256 条累计动态",
-  },
-  {
-    href: "/funding",
-    icon: "💰",
-    tone: "orange",
-    name: "资金 & 物资",
-    desc: "基金会资助、政府购买、企业CSR、招标采购与合作共建，一网打尽申报机会。",
-    meta: "1,825 条资助征集 · 累计资助额 8.6亿+",
-  },
-  {
-    href: "/hr",
-    icon: "💼",
-    tone: "blue",
-    name: "人力资源",
-    desc: "汇集公开来源的公益行业全职 / 兼职 / 实习岗位，并保留原站投递入口。",
-    meta: `${scrapedJobCount} 条当前收录岗位 · ${scrapedOrgCount} 家当前收录机构`,
-  },
-  {
-    href: "/tools",
-    icon: "🧰",
-    tone: "purple",
-    name: "能力工具",
-    desc: "培训课程、行业沙龙、工具模板、行业报告、标准与经验文章。",
-    meta: "3,256 件能力工具 · 1,425 份工具模板",
-  },
-];
+export default async function Home() {
+  const [fundings, jobs, tools] = await Promise.all([
+    platformDataSource.getFundings(),
+    platformDataSource.getJobs(),
+    platformDataSource.getTools(),
+  ]);
+  const modules = platformModules(fundings.length, jobs, tools.length);
 
-export default function Home() {
   return (
     <div className="module-page">
       <SiteHeader active="home" />

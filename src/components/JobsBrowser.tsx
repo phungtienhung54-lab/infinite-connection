@@ -2,9 +2,8 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { filterGroups, type JobItem } from "@/lib/platform-data";
-import { isPublished } from "@/lib/review-status";
-import scrapedJobs from "@/lib/jobs-scraped.json";
+import { filterGroups } from "@/lib/platform-config";
+import type { JobItem } from "@/lib/platform-types";
 import { TypeTabs, FilterRow, SearchInput, EmptyState } from "./platform-ui";
 
 function dedupeByTitle<T extends { title: string }>(items: T[]): T[] {
@@ -18,39 +17,9 @@ function dedupeByTitle<T extends { title: string }>(items: T[]): T[] {
   });
 }
 
-const initialJobs = dedupeByTitle(
-  (scrapedJobs as unknown as JobItem[])
-    // 只展示通过人工审核的岗位；历史快照没有 status 字段，视为已发布。
-    .filter(isPublished)
-    .map((job) => ({
-      ...job,
-      id: String(job.id),
-    })),
-);
 type JobCategory = NonNullable<JobItem["category"]>;
 
 const jobTabs = [{ label: "人员招聘" }, { label: "志愿者招募" }];
-
-const scrapedJobStats = [
-  { label: "当前收录岗位", value: String(initialJobs.length) },
-  {
-    label: "30天内新增",
-    value: String(initialJobs.filter((job) => job.publishedDays <= 30).length),
-  },
-  { label: "收录机构", value: String(new Set(initialJobs.map((job) => job.org)).size) },
-  {
-    label: "线上/远程岗位",
-    value: String(
-      initialJobs.filter(
-        (job) => job.location.includes("远程") || job.location.includes("线上"),
-      ).length,
-    ),
-  },
-];
-
-const latestJobs = [...initialJobs]
-  .sort((a, b) => a.publishedDays - b.publishedDays)
-  .slice(0, 3);
 
 const kindTagClass: Record<string, string> = {
   全职: "tag-green",
@@ -70,29 +39,46 @@ function regionMatch(category: JobCategory, region: string, location: string): b
   return location.includes(region) || location.includes(shortRegion);
 }
 
-export function JobsBrowser() {
-  const [items] = useState<JobItem[]>(initialJobs);
+export function JobsBrowser({ jobs }: { jobs: JobItem[] }) {
+  const items = useMemo(() => dedupeByTitle(jobs), [jobs]);
   const [category, setCategory] = useState<JobCategory>("人员招聘");
   const [kind, setKind] = useState("全部");
   const [role, setRole] = useState("全部");
   const [servicePeriod, setServicePeriod] = useState("全部");
   const [region, setRegion] = useState("全国");
   const [search, setSearch] = useState("");
+  const scrapedJobStats = [
+    { label: "当前收录岗位", value: String(items.length) },
+    {
+      label: "30天内新增",
+      value: String(items.filter((job) => job.publishedDays <= 30).length),
+    },
+    { label: "收录机构", value: String(new Set(items.map((job) => job.org)).size) },
+    {
+      label: "线上/远程岗位",
+      value: String(
+        items.filter(
+          (job) => job.location.includes("远程") || job.location.includes("线上"),
+        ).length,
+      ),
+    },
+  ];
+  const latestJobs = [...items]
+    .sort((a, b) => a.publishedDays - b.publishedDays)
+    .slice(0, 3);
 
-  const filtered = useMemo(() => {
-    const q = search.trim();
-    return items
-      .filter(
-        (j) =>
-          jobCategory(j) === category &&
-          (category !== "人员招聘" || kind === "全部" || j.kind === kind) &&
-          (role === "全部" || j.role === role) &&
-          (category !== "志愿者招募" || servicePeriod === "全部" || j.servicePeriod === servicePeriod) &&
-          regionMatch(category, region, j.location) &&
-          (!q || j.title.includes(q) || j.org.includes(q) || j.summary.includes(q)),
-      )
-      .sort((a, b) => a.publishedDays - b.publishedDays);
-  }, [items, category, kind, role, servicePeriod, region, search]);
+  const q = search.trim();
+  const filtered = items
+    .filter(
+      (job) =>
+        jobCategory(job) === category &&
+        (category !== "人员招聘" || kind === "全部" || job.kind === kind) &&
+        (role === "全部" || job.role === role) &&
+        (category !== "志愿者招募" || servicePeriod === "全部" || job.servicePeriod === servicePeriod) &&
+        regionMatch(category, region, job.location) &&
+        (!q || job.title.includes(q) || job.org.includes(q) || job.summary.includes(q)),
+    )
+    .sort((a, b) => a.publishedDays - b.publishedDays);
 
   const resetFilters = (nextCategory = category) => {
     setKind("全部");

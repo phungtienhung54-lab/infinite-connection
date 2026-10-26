@@ -1,5 +1,4 @@
 import Image from "next/image";
-import { updates } from "@/lib/platform-data";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import { getComments } from "@/lib/actions/interactions";
@@ -227,78 +226,15 @@ export default async function UpdateDetailPage({
     );
   }
 
-  const item = updates.find((u) => u.id === id);
-
-  if (!item) {
-    return (
-      <div className="module-page">
-        <SiteHeader active="updates" />
-        <div className="detail-not-found">
-          <h2>未找到该动态</h2>
-          <Link href="/updates" className="card-link">
-            ← 返回项目动态列表
-          </Link>
-        </div>
-        <PlatformFooter />
-      </div>
-    );
-  }
-
   return (
     <div className="module-page">
       <SiteHeader active="updates" />
-      <main className="detail-page">
-        <div className="detail-topbar">
-          <Link href="/updates" className="detail-back">← 返回项目动态</Link>
-        </div>
-
-        <article className="pc-card detail-card">
-          <div className="detail-tags">
-            {(item.fields?.length ? item.fields : [item.field]).map((field) => (
-              <span key={field} className="tag tag-green">{field}</span>
-            ))}
-            <span className="tag tag-rating">⭐ {item.rating.toFixed(1)}</span>
-          </div>
-
-          <h1 className="detail-title">{item.title}</h1>
-
-          <div className="detail-meta">
-            <span>发布机构：{item.org}</span>
-            <span>更新时间：{item.time}</span>
-            <span>地域：{item.location}</span>
-          </div>
-
-          <div className="detail-divider" />
-          <div className="detail-body">{item.content}</div>
-
-          {item.hashtags.length > 0 && (
-            <div className="detail-hashtags">
-              {item.hashtags.map((h) => (
-                <span key={h} className="hashtag">#{h}# </span>
-              ))}
-            </div>
-          )}
-        </article>
-
-        <section className="pc-card detail-actions-card" aria-label="内容互动">
-          <div className="detail-actions-head">
-            <h2>支持这个项目</h2>
-            <p>分享给朋友，让更多人看见这个项目。</p>
-          </div>
-          <ContentActions
-            contentId={item.id}
-            title={item.title}
-            text={item.content}
-            href={`/updates/${item.id}`}
-            shares={0}
-            showHelp={false}
-            interactive={false}
-          />
-          <p className="detail-static-note">
-            该内容为历史示例，暂不支持点赞、评论或搭把手。
-          </p>
-        </section>
-      </main>
+      <div className="detail-not-found" style={{ textAlign: "center", padding: "100px 20px" }}>
+        <h2 style={{ fontSize: "24px", marginBottom: "20px" }}>未找到该动态</h2>
+        <Link href="/updates" className="card-link" style={{ color: "var(--primary-color)" }}>
+          ← 返回项目动态列表
+        </Link>
+      </div>
       <PlatformFooter />
     </div>
   );

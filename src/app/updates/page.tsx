@@ -6,7 +6,7 @@ import { prisma } from "@/lib/db";
 import { provinceNames } from "@/lib/cn-divisions";
 import { publicInterestFields } from "@/lib/publishing";
 import { formatRelativeHours, hoursSince } from "@/lib/relative-time";
-import type { UpdateItem } from "@/lib/platform-data";
+import type { UpdateItem } from "@/lib/platform-types";
 import "../platform.css";
 
 // 列表数据来自数据库，禁用缓存以保证发布后立刻可见。
